@@ -27,5 +27,6 @@ One file per issue, numbered in the order found. Resolved issues stay listed wit
 | 19 | [Ticket list capped at 200 rows, no pagination](19-ticket-list-capped-at-200.md) | Step 5 | 🟡 Truncation | Later / note |
 | 20 | [`vercel link` fails on this machine (Windows symlink)](20-vercel-link-windows-symlink.md) | Step 6 | 🟡 Local tooling | Worked around |
 | 21 | [Customer viewing an old ticket sees no follow-up indicator](21-customer-view-no-followup-indicator.md) | Step 7 | 🟡 Minor UX gap | Open |
+| 22 | ~~[Demo agent password was published in the public repo](22-demo-password-published.md)~~ | Post-build | 🔴 Real exposure | ✅ Resolved (rotate via env var) |
 
 **Next:** none — all 8 build steps are done (`PROJECT_SUMMARY.md`'s checklist is fully ticked). `notes/14`, `19`, and `21` remain open as known, documented gaps (see the README's "What I didn't finish" section); `notes/20` is a local-tooling quirk, already worked around.

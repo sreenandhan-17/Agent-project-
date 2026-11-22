@@ -6,7 +6,7 @@ A support ticket system for Arvo Systems: 9 agents, ~40 tickets a day, replacing
 
 **https://frontdesk-mu-neon.vercel.app**
 
-**Agent login IDs** (all 9, from `backend/seed.py`) — every account uses the same password, shared separately rather than written down here (this repo is public, and writing a working password into it would expose the live demo to anyone browsing GitHub):
+**Agent login IDs** (all 9, from `backend/seed.py`):
 
 | Name | Email (login ID) | Role |
 |---|---|---|
@@ -19,6 +19,8 @@ A support ticket system for Arvo Systems: 9 agents, ~40 tickets a day, replacing
 | Sneha Kulkarni | `sneha@arvo.example` | Agent |
 | Karthik Reddy | `karthik@arvo.example` | Agent |
 | Divya Joshi | `divya@arvo.example` | Agent |
+
+Demo password is shared privately with reviewers in the submission note.
 
 **Customer:** no login — open [`/new`](https://frontdesk-mu-neon.vercel.app/new) to submit a ticket.
 
@@ -134,7 +136,7 @@ npm run dev                                         # http://localhost:5173
 ./venv/Scripts/pytest
 ```
 
-Log in at `http://localhost:5173/login` with any seeded agent email above. With `ENV=dev` and `SEED_AGENT_PASSWORD` unset, the password is the dev-only placeholder `seed.py` prints when it runs (`dev-only-seed-password-do-not-use-in-production` — safe to publish, since it's never valid against a real deploy). The customer portal is at `http://localhost:5173/new`.
+Log in at `http://localhost:5173/login` with any seeded agent email above; the password is whatever you passed to `DEMO_AGENT_PASSWORD` when seeding (or the dev-only placeholder `seed.py` prints if you left it unset with `ENV=dev`). The customer portal is at `http://localhost:5173/new`.
 
 ⚠️ **`TEST_DATABASE_URL`, if set, is wiped and rebuilt from scratch on every pytest run.** Point it at a disposable database, never at `DATABASE_URL` or anything with real data. Leaving it unset is fine — tests then run against `DATABASE_URL` inside a transaction that's always rolled back.
 

@@ -1,13 +1,13 @@
 """Seed demo data. Safe to run repeatedly: existing rows are left alone.
 
 Usage (from /backend):
-  SEED_AGENT_PASSWORD="<password>" python seed.py        # macOS/Linux/bash
-  $env:SEED_AGENT_PASSWORD="<password>"; python seed.py   # PowerShell
+  DEMO_AGENT_PASSWORD="<password>" python seed.py        # bash
+  $env:DEMO_AGENT_PASSWORD="<password>"; python seed.py   # PowerShell
 
-The real demo password is never committed to this repo (it was once, and got rotated —
-don't repeat that). It's only ever passed inline on the command line, like DATABASE_URL
-already is for production seeding; see DEPLOY.md. With ENV=dev and the variable unset, a
-clearly-fake local-only placeholder is used instead, so local dev still works with no setup.
+The real demo password is never hard-coded or committed here. With ENV=dev and the variable
+unset, a clearly-fake local-only placeholder is used instead, so local dev needs no setup.
+To change an existing deployment's password without re-running the full seed, use
+scripts/reset_agent_passwords.py instead.
 """
 
 import os
@@ -40,19 +40,19 @@ _DEV_ONLY_PASSWORD = "dev-only-seed-password-do-not-use-in-production"
 
 
 def _demo_password() -> str:
-    # os.environ, not Settings().seed_agent_password: this must work whether SEED_AGENT_PASSWORD
-    # is a real shell env var or came from backend/.env, same as DATABASE_URL etc. get_settings()
-    # is only used for is_dev, so this honors ENV=dev from a .env file the same way the rest of
-    # the app does, rather than requiring ENV to be exported separately from the .env file.
-    password = os.environ.get("SEED_AGENT_PASSWORD")
+    # os.environ, not get_settings(): this must work whether DEMO_AGENT_PASSWORD is a real
+    # shell env var or came from backend/.env, same as DATABASE_URL already does. get_settings()
+    # is only used for is_dev, so ENV=dev from a .env file is honored the same way the rest of
+    # the app honors it, without requiring ENV to be separately exported.
+    password = os.environ.get("DEMO_AGENT_PASSWORD")
     if password:
         return password
     if get_settings().is_dev:
         return _DEV_ONLY_PASSWORD
     raise SystemExit(
-        "SEED_AGENT_PASSWORD is not set (required unless ENV=dev). Pick a password and pass "
-        "it inline, the same way DATABASE_URL is passed for production seeding — never commit "
-        "it. Example: SEED_AGENT_PASSWORD=\"...\" python seed.py"
+        "DEMO_AGENT_PASSWORD is not set (required unless ENV=dev). Pass it inline, the same "
+        "way DATABASE_URL is passed for production seeding — never commit it. Example: "
+        "DEMO_AGENT_PASSWORD=\"...\" python seed.py"
     )
 
 
