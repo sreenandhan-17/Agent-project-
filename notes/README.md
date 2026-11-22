@@ -1,15 +1,22 @@
 # Notes: open issues and next step
 
-Status after step 1: **no failing tests or errors.** These are known gaps to close.
+One file per issue, numbered in the order found. Resolved issues stay listed with ✅.
 
-| # | Issue | Severity | Fixed in |
-|---|---|---|---|
-| 01 | ~~[SLA due dates are NULL on seeded tickets](01-sla-due-dates-null.md)~~ | ✅ Resolved | Step 2 |
-| 02 | ~~[Festival holiday dates need verification](02-verify-holiday-dates.md)~~ | ✅ Resolved | After step 2 |
-| 03 | ~~[Deprecation warning in pytest output](03-pytest-deprecation-warning.md)~~ | ✅ Resolved | After step 2 |
-| 04 | ~~[Line-ending (CRLF) warnings on commit](04-line-endings.md)~~ | ✅ Resolved | After step 2 |
-| 05 | [Local dev depends on Docker; Neon not set up](05-database-local-vs-neon.md) | Deploy blocker | Step 6 |
-| 06 | [No Vercel entrypoint yet](06-vercel-entrypoint.md) | Deploy blocker | Step 6 |
-| 07 | [No README / local setup docs](07-readme-missing.md) | Deliverable | Step 8 |
+**Status after step 3:** 101 tests passing, no errors.
 
-**Next:** [NEXT-STEP.md](NEXT-STEP.md): build step 2, the working-hours calculator.
+| # | Issue | Found | Severity | Status / fixed in |
+|---|---|---|---|---|
+| 01 | ~~[SLA due dates are NULL on seeded tickets](01-sla-due-dates-null.md)~~ | Step 1 | Expected gap | ✅ Resolved (step 2) |
+| 02 | ~~[Festival holiday dates need verification](02-verify-holiday-dates.md)~~ | Step 1 | Data accuracy | ✅ Resolved (after step 2) |
+| 03 | ~~[Deprecation warning in pytest output](03-pytest-deprecation-warning.md)~~ | Step 1 | Cosmetic | ✅ Resolved (after step 2) |
+| 04 | ~~[Line-ending (CRLF) warnings on commit](04-line-endings.md)~~ | Step 1 | Cosmetic | ✅ Resolved (after step 2) |
+| 05 | [Local dev depends on Docker; Neon not set up](05-database-local-vs-neon.md) | Step 1 | Deploy blocker | Step 6 |
+| 06 | [No Vercel entrypoint yet](06-vercel-entrypoint.md) | Step 1 | Deploy blocker | Step 6 |
+| 07 | [No README / local setup docs](07-readme-missing.md) | Step 1 | Deliverable | Step 8 |
+| 08 | [Endpoints trust an `X-Agent-Id` header (temporary auth)](08-temporary-agent-header-auth.md) | Step 3 | 🔴 Security | Step 4/5, before deploy |
+| 09 | [7-day reopen window not enforced](09-reopen-window-not-enforced.md) | Step 3 | 🟠 Rule gap | Step 7 |
+| 10 | [Any agent can change any ticket's status/priority](10-who-may-change-status.md) | Step 3 | 🟡 Decision needed | Step 4 |
+| 11 | [Stored deadlines ignore the current pause](11-stored-deadlines-during-pause.md) | Step 3 | 🟡 Late filter | Step 5 |
+| 12 | [`first_response_at` is never set](12-first-response-at-never-set.md) | Step 3 | 🟠 Rule gap | Step 4 |
+
+**Next:** [NEXT-STEP.md](NEXT-STEP.md): build step 4, atomic claim and the public/internal message split.

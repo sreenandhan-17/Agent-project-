@@ -1,8 +1,29 @@
+from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.models import ActorType, AuditAction, AuditEvent
+
+
+@dataclass(frozen=True)
+class Actor:
+    """Who performed an action. id is NULL for SYSTEM."""
+
+    type: ActorType
+    id: int | None = None
+
+    @classmethod
+    def agent(cls, agent_id: int) -> "Actor":
+        return cls(ActorType.AGENT, agent_id)
+
+    @classmethod
+    def customer(cls, customer_id: int) -> "Actor":
+        return cls(ActorType.CUSTOMER, customer_id)
+
+    @classmethod
+    def system(cls) -> "Actor":
+        return cls(ActorType.SYSTEM, None)
 
 
 def record_event(
@@ -30,3 +51,16 @@ def record_event(
     )
     session.add(event)
     return event
+
+
+def record(
+    session: Session,
+    ticket_id: int | None,
+    actor: Actor,
+    action: AuditAction,
+    field: str | None = None,
+    old: Any = None,
+    new: Any = None,
+) -> AuditEvent:
+    """record_event() taking an Actor."""
+    return record_event(session, ticket_id, actor.type, actor.id, action, field, old, new)

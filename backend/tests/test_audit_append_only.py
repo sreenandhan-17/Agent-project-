@@ -1,29 +1,18 @@
 """INC-0318: audit_events must be append-only, enforced by the database.
 
-Each test runs inside a transaction that is rolled back, so no test rows are left behind
-(they could never be deleted otherwise).
+Each test runs inside a transaction that is rolled back (conftest `session`), so no test rows
+are left behind (they could never be deleted otherwise).
 """
 
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import Engine, text
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app.models import AuditAction, AuditEvent, AuthorType
 from app.services.audit import record_event
-
-
-@pytest.fixture
-def session(engine: Engine):
-    conn = engine.connect()
-    outer = conn.begin()
-    s = Session(bind=conn, join_transaction_mode="create_savepoint")
-    yield s
-    s.close()
-    outer.rollback()
-    conn.close()
 
 
 @pytest.fixture
