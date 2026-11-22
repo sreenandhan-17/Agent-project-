@@ -1,4 +1,6 @@
-"""Step 6: the cron endpoint is protected by CRON_SECRET (stub logic; real work is step 7)."""
+"""The cron endpoint is protected by CRON_SECRET. Real auto-close logic is tested in
+tests/test_auto_close.py; this file only covers the auth gate and response shape.
+"""
 
 import pytest
 
@@ -23,7 +25,10 @@ def test_correct_secret_accepted(api):
     headers = {"Authorization": f"Bearer {get_settings().cron_secret}"}
     r = api.get("/api/cron/auto-close", headers=headers)
     assert r.status_code == 200
-    assert r.json()["status"] == "ok"
+    body = r.json()
+    assert body["status"] == "ok"
+    assert isinstance(body["closed"], int)
+    assert isinstance(body["ticket_ids"], list)
 
 
 def test_endpoint_does_not_require_agent_login(api):

@@ -42,6 +42,14 @@ class NewTicketOut(BaseModel):
     ticket: CustomerTicketView
 
 
+class ReplyOut(BaseModel):
+    # Same shape as NewTicketOut, named for this route: `token` is the token to use going
+    # forward. It's usually the same token the customer already has, but differs when the
+    # reply landed on a new follow-up ticket instead (§3.5) — the frontend must redirect there.
+    token: str
+    ticket: CustomerTicketView
+
+
 def _ticket_by_token(session: Session, token: str, *, lock: bool = False) -> Ticket:
     stmt = select(Ticket).where(Ticket.public_token == token)
     if lock:
@@ -81,10 +89,13 @@ def view_ticket(token: str, session: Session = Depends(get_session)):
     return serialize_for_customer(ticket, ticket.messages)
 
 
-@router.post("/tickets/{token}/replies", response_model=CustomerTicketView, status_code=201)
+@router.post("/tickets/{token}/replies", response_model=ReplyOut, status_code=201)
 def customer_reply(token: str, body: CustomerReplyIn, session: Session = Depends(get_session)):
     ticket = _ticket_by_token(session, token, lock=True)
-    add_customer_reply(session, ticket, body.body)
+    resulting_ticket, _message = add_customer_reply(session, ticket, body.body)
     session.commit()
-    session.refresh(ticket, ["messages"])
-    return serialize_for_customer(ticket, ticket.messages)
+    session.refresh(resulting_ticket, ["messages"])
+    return ReplyOut(
+        token=resulting_ticket.public_token,
+        ticket=serialize_for_customer(resulting_ticket, resulting_ticket.messages),
+    )

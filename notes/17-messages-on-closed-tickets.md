@@ -1,5 +1,14 @@
 # 17: Replies and notes are accepted on RESOLVED/CLOSED tickets
 
+> **✅ RESOLVED in step 7 (decision: block, as recommended).** `add_reply()` raises
+> `TicketClosed` (409 "This ticket is closed. Reopen it before replying.") when `ticket.status
+> is CLOSED`; RESOLVED is still allowed, since only CLOSED is truly terminal. Internal notes
+> are never blocked, on any status. `add_customer_reply()` now calls `transition(...,
+> REOPENED, ...)` within the 7-day window, or `create_follow_up()` past it (note 09). Tests:
+> `tests/test_reopen_and_followup.py` (the note-17-specific cases: agent reply blocked on
+> CLOSED, still allowed on RESOLVED, internal notes always allowed, customer reply resuming vs
+> reopening vs follow-up).
+
 **Found in:** step 4
 **Severity:** 🟡 Rule gap
 **Fixed in:** step 7 (alongside reopen)

@@ -54,7 +54,11 @@ def test_table_matches_project_summary():
 @pytest.mark.parametrize("from_s, to_s", ALLOWED, ids=lambda s: s.value)
 def test_allowed_transition_applies_and_is_audited(session, make_ticket, actor, from_s, to_s):
     paused_at = ist(23, 11) if from_s is S.WAITING_ON_CUSTOMER else None
-    ticket = make_ticket(ist(23, 10), status=from_s, paused_at=paused_at)
+    # RESOLVED/CLOSED always carry resolved_at/closed_at in real use (transition() sets them on
+    # the way in); REOPENED's 7-day window check needs one to be set, same as production.
+    anchor_field = {S.RESOLVED: "resolved_at", S.CLOSED: "closed_at"}.get(from_s)
+    anchor = {anchor_field: ist(23, 11)} if anchor_field else {}
+    ticket = make_ticket(ist(23, 10), status=from_s, paused_at=paused_at, **anchor)
     move(session, ticket, to_s, actor, ist(23, 12))
 
     assert ticket.status is to_s

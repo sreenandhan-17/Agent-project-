@@ -7,9 +7,9 @@ audit events in the caller's transaction and never commit.
 
 import enum
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -26,7 +26,7 @@ from app.models import (
     Visibility,
 )
 from app.services.audit import Actor, record
-from app.sla.policy import compute_deadlines, load_holidays
+from app.sla.policy import compute_deadlines, deadlines_for, load_holidays
 from app.sla.working_hours import working_minutes_between
 
 S = TicketStatus
@@ -40,6 +40,9 @@ ALLOWED_TRANSITIONS: dict[TicketStatus, frozenset[TicketStatus]] = {
     S.REOPENED: frozenset({S.WAITING_ON_CUSTOMER, S.RESOLVED}),
 }
 
+AUTO_CLOSE_WORKING_MINUTES = 2700  # 5 working days (§3.4)
+REOPEN_WINDOW_DAYS = 7  # calendar days, not working days (§3.5)
+
 
 class InvalidTransition(Exception):
     def __init__(self, from_status: TicketStatus, to_status: TicketStatus):
@@ -47,6 +50,26 @@ class InvalidTransition(Exception):
         self.to_status = to_status
         self.allowed = sorted(s.value for s in ALLOWED_TRANSITIONS[from_status])
         super().__init__(f"cannot move ticket from {from_status.value} to {to_status.value}")
+
+
+class ReopenWindowExpired(Exception):
+    """Raised by transition() targeting REOPENED when more than REOPEN_WINDOW_DAYS calendar
+    days have passed since resolution/closure (§3.5). Customer replies should fall back to
+    create_follow_up(); agent requests just get a clear error.
+    """
+
+    def __init__(self, ticket: Ticket, anchor_at: datetime, anchor_field: str):
+        self.ticket = ticket
+        self.anchor_at = anchor_at
+        self.anchor_field = anchor_field  # "resolved_at" | "closed_at"
+        super().__init__(
+            f"ticket {ticket.id} cannot be reopened: more than {REOPEN_WINDOW_DAYS} calendar "
+            f"days have passed since {anchor_field}"
+        )
+
+
+class TicketClosed(Exception):
+    """Agent reply attempted on a CLOSED ticket (note 17, decided: block; reopen first)."""
 
 
 def may_change_status(ticket: Ticket, agent: Agent, to_status: TicketStatus) -> bool:
@@ -96,12 +119,25 @@ def transition(
     now: datetime | None = None,
     holidays: set[date] | None = None,
 ) -> None:
-    """Validate and apply a status change, with SLA pause/resume. Raises InvalidTransition."""
+    """Validate and apply a status change, with SLA pause/resume. Raises InvalidTransition, or
+    ReopenWindowExpired if targeting REOPENED more than REOPEN_WINDOW_DAYS after resolution.
+    """
     from_status = ticket.status
     if to_status not in ALLOWED_TRANSITIONS[from_status]:
         raise InvalidTransition(from_status, to_status)
 
     now = _now(now)
+
+    if to_status is S.REOPENED:
+        anchor_field = "resolved_at" if ticket.resolved_at is not None else "closed_at"
+        anchor_at = ticket.resolved_at or ticket.closed_at
+        if anchor_at is None:
+            # Invariant: transition() always sets resolved_at/closed_at on the way into
+            # RESOLVED/CLOSED, and REOPENED is only reachable from those two statuses.
+            raise ValueError(f"ticket {ticket.id} has neither resolved_at nor closed_at")
+        if now - anchor_at > timedelta(days=REOPEN_WINDOW_DAYS):
+            raise ReopenWindowExpired(ticket, anchor_at, anchor_field)
+
     if holidays is None:
         holidays = load_holidays(session)
 
@@ -122,10 +158,35 @@ def transition(
     elif to_status is S.CLOSED:
         ticket.closed_at = now
     elif to_status is S.REOPENED:
-        # 7-day window and fresh resolution deadline come in build step 7 (notes/09).
+        old_resolution_due = _iso(ticket.resolution_due_at)
         ticket.reopen_count = (ticket.reopen_count or 0) + 1
         ticket.resolved_at = None
         ticket.closed_at = None
+        # Fresh resolution clock from the reopen moment, same priority, no carried-over pause
+        # (§3.5). first_response_at/_due_at are untouched: that target was already met earlier
+        # in the ticket's life and isn't meaningful again on reopen.
+        _, ticket.resolution_due_at = deadlines_for(ticket.priority, now, 0, holidays)
+        record(
+            session, ticket.id, actor, AuditAction.REOPENED, "resolution_due_at",
+            old_resolution_due, _iso(ticket.resolution_due_at),
+        )
+
+
+def reopen(
+    session: Session,
+    ticket: Ticket,
+    actor: Actor,
+    *,
+    now: datetime | None = None,
+    holidays: set[date] | None = None,
+) -> None:
+    """Reopen a RESOLVED/CLOSED ticket within REOPEN_WINDOW_DAYS (§3.5). Thin, readable alias
+    for transition(..., TicketStatus.REOPENED, ...) — all the actual rules live there, so this
+    can't be bypassed or diverge from PATCH /status targeting REOPENED directly.
+
+    Raises ReopenWindowExpired if the window has passed.
+    """
+    transition(session, ticket, S.REOPENED, actor, now=now, holidays=holidays)
 
 
 def change_priority(
@@ -237,9 +298,15 @@ class NotAssignee(Exception):
 def add_reply(
     session: Session, ticket: Ticket, agent: Agent, body: str, *, now: datetime | None = None
 ) -> Message:
-    """PUBLIC reply. Assignee only (INC-0291). The first one sets first_response_at (§3.1)."""
+    """PUBLIC reply. Assignee only (INC-0291). The first one sets first_response_at (§3.1).
+
+    Blocked on CLOSED tickets (note 17, decided): reopen first. RESOLVED is still allowed —
+    only CLOSED is truly terminal. Internal notes (add_note) are never blocked.
+    """
     if ticket.assignee_id != agent.id:
         raise NotAssignee()
+    if ticket.status is S.CLOSED:
+        raise TicketClosed()
     now = _now(now)
     message = Message(
         ticket_id=ticket.id,
@@ -279,6 +346,49 @@ def add_note(
         None, message.id,
     )
     return message
+
+
+# --- Auto-close (§3.4) ----------------------------------------------------------------------
+
+
+def auto_close_overdue_tickets(
+    session: Session, *, now: datetime | None = None, holidays: set[date] | None = None
+) -> list[Ticket]:
+    """Close WAITING_ON_CUSTOMER/RESOLVED tickets with no customer reply for 5 working days.
+
+    The clock counts from paused_at (waiting) or resolved_at (resolved). Actor is SYSTEM.
+    Idempotent: a closed ticket's status no longer matches the query, so re-running the job
+    finds nothing left to do for it.
+    """
+    now = _now(now)
+    if holidays is None:
+        holidays = load_holidays(session)
+    actor = Actor.system()
+
+    candidates = session.scalars(
+        select(Ticket).where(
+            Ticket.status.in_((TicketStatus.WAITING_ON_CUSTOMER, TicketStatus.RESOLVED))
+        )
+    ).all()
+
+    closed = []
+    for ticket in candidates:
+        anchor = (
+            ticket.paused_at if ticket.status is TicketStatus.WAITING_ON_CUSTOMER
+            else ticket.resolved_at
+        )
+        if anchor is None:
+            continue  # shouldn't happen given the invariants, but don't let one bad row crash the job
+        elapsed = working_minutes_between(anchor, now, holidays)
+        if elapsed < AUTO_CLOSE_WORKING_MINUTES:
+            continue
+        transition(session, ticket, S.CLOSED, actor, now=now, holidays=holidays)
+        record(
+            session, ticket.id, actor, AuditAction.AUTO_CLOSED, "elapsed_working_minutes",
+            None, elapsed,
+        )
+        closed.append(ticket)
+    return closed
 
 
 # --- Customer side -------------------------------------------------------------------------
@@ -351,15 +461,91 @@ def create_customer_ticket(
     return ticket
 
 
-def add_customer_reply(
-    session: Session, ticket: Ticket, body: str, *, now: datetime | None = None
-) -> Message:
-    """Customer reply. Resumes the SLA clock if the ticket was waiting on the customer (§3.3).
+def create_follow_up(
+    session: Session,
+    old_ticket: Ticket,
+    body: str,
+    *,
+    now: datetime | None = None,
+    holidays: set[date] | None = None,
+) -> tuple[Ticket, Message]:
+    """A customer reply arrives more than REOPEN_WINDOW_DAYS after resolution/closure: open a
+    new ticket linked to the old one instead of reopening it (§3.5).
 
-    Reopening resolved/closed tickets (7-day window) is build step 7 (notes/09).
+    Same priority as the parent; flagged needs_triage since it's effectively a fresh report an
+    agent should re-confirm. The customer's message lands on the NEW ticket only.
     """
     now = _now(now)
+    if holidays is None:
+        holidays = load_holidays(session)
+    actor = Actor.customer(old_ticket.customer_id)
+
+    new_ticket = Ticket(
+        subject=f"Follow-up: {old_ticket.subject}",
+        customer_id=old_ticket.customer_id,
+        status=TicketStatus.NEW,
+        priority=old_ticket.priority,
+        created_at=now,
+        last_customer_reply_at=now,
+        paused_minutes=0,
+        reopen_count=0,
+        needs_triage=True,
+        customer_impact=old_ticket.customer_impact,
+        parent_ticket_id=old_ticket.id,
+    )
+    new_ticket.first_response_due_at, new_ticket.resolution_due_at = compute_deadlines(
+        new_ticket, holidays
+    )
+    session.add(new_ticket)
+    session.flush()
+
+    message = Message(
+        ticket_id=new_ticket.id,
+        author_type=AuthorType.CUSTOMER,
+        author_customer_id=old_ticket.customer_id,
+        visibility=Visibility.PUBLIC,
+        body=body,
+        created_at=now,
+    )
+    session.add(message)
+    session.flush()
+
+    record(
+        session, old_ticket.id, actor, AuditAction.FOLLOW_UP_CREATED, "parent_ticket_id",
+        None, new_ticket.id,
+    )
+    record(
+        session, new_ticket.id, actor, AuditAction.TICKET_CREATED, None, None,
+        {
+            "subject": new_ticket.subject,
+            "priority": new_ticket.priority.value,
+            "status": TicketStatus.NEW.value,
+            "needs_triage": True,
+            "parent_ticket_id": old_ticket.id,
+        },
+    )
+    return new_ticket, message
+
+
+def add_customer_reply(
+    session: Session, ticket: Ticket, body: str, *, now: datetime | None = None
+) -> tuple[Ticket, Message]:
+    """Customer reply. Resumes the SLA clock if waiting; reopens within the 7-day window if
+    resolved/closed, or creates a linked follow-up ticket after the window (§3.3, §3.5).
+
+    Returns (ticket_the_message_landed_on, message) — this differs from the input `ticket`
+    only when a follow-up was created, so callers must use the returned ticket, not the input.
+    """
+    now = _now(now)
+    holidays = load_holidays(session)
     actor = Actor.customer(ticket.customer_id)
+
+    if ticket.status in (TicketStatus.RESOLVED, TicketStatus.CLOSED):
+        try:
+            transition(session, ticket, TicketStatus.REOPENED, actor, now=now, holidays=holidays)
+        except ReopenWindowExpired:
+            return create_follow_up(session, ticket, body, now=now, holidays=holidays)
+
     message = Message(
         ticket_id=ticket.id,
         author_type=AuthorType.CUSTOMER,
@@ -373,5 +559,5 @@ def add_customer_reply(
     session.flush()
     record(session, ticket.id, actor, AuditAction.CUSTOMER_REPLIED, "message_id", None, message.id)
     if ticket.status is TicketStatus.WAITING_ON_CUSTOMER:
-        transition(session, ticket, TicketStatus.OPEN, actor, now=now)
-    return message
+        transition(session, ticket, TicketStatus.OPEN, actor, now=now, holidays=holidays)
+    return ticket, message

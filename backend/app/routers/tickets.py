@@ -32,11 +32,14 @@ from app.services.tickets import (
     ClaimOutcome,
     InvalidTransition,
     NotAssignee,
+    ReopenWindowExpired,
+    TicketClosed,
     add_note,
     add_reply,
     change_priority,
     claim,
     may_change_status,
+    reopen,
     transition,
 )
 
@@ -125,6 +128,7 @@ class TicketDetail(TicketListItem):
     customer: CustomerOut
     public_token: str
     parent_ticket_number: str | None
+    follow_up_ticket_number: str | None  # set on the OLD ticket once a follow-up exists (§3.5)
     allowed_statuses: list[TicketStatus]  # transitions THIS agent may make now
     messages: list[AgentMessageOut]
 
@@ -147,6 +151,14 @@ def _list_item(ticket: Ticket, now: datetime, holidays: set) -> TicketListItem:
         customer_name=ticket.customer.name,
         assignee_name=ticket.assignee.name if ticket.assignee else None,
         sla=SlaOut(**asdict(sla_state(ticket, now, holidays))),
+    )
+
+
+def _reopen_expired_message(e: ReopenWindowExpired) -> str:
+    when = e.anchor_field.replace("_at", "")  # "resolved" | "closed"
+    return (
+        f"This ticket was {when} more than 7 days ago and can no longer be reopened. "
+        "A customer reply would open a new, linked follow-up ticket instead."
     )
 
 
@@ -195,12 +207,19 @@ def get_ticket(
     holidays = load_holidays(session)
     agents = {a.id: a.name for a in session.scalars(select(Agent))}
     parent = session.get(Ticket, ticket.parent_ticket_id) if ticket.parent_ticket_id else None
+    follow_up = session.scalars(
+        select(Ticket)
+        .where(Ticket.parent_ticket_id == ticket.id)
+        .order_by(Ticket.id.desc())
+        .limit(1)
+    ).first()
     item = _list_item(ticket, now, holidays)
     return TicketDetail(
         **item.model_dump(),
         customer=CustomerOut.model_validate(ticket.customer),
         public_token=ticket.public_token,
         parent_ticket_number=parent.number if parent else None,
+        follow_up_ticket_number=follow_up.number if follow_up else None,
         allowed_statuses=sorted(
             (s for s in ALLOWED_TRANSITIONS[ticket.status] if may_change_status(ticket, agent, s)),
             key=lambda s: s.value,
@@ -267,6 +286,9 @@ def update_status(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             {"message": str(e), "from": e.from_status.value, "allowed": e.allowed},
         )
+    except ReopenWindowExpired as e:
+        session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, _reopen_expired_message(e))
     session.commit()
     return ticket
 
@@ -302,6 +324,36 @@ def claim_ticket(
     return _get_ticket(session, ticket_id)
 
 
+@router.post("/{ticket_id}/reopen", response_model=TicketOut)
+def reopen_ticket(
+    ticket_id: int,
+    session: Session = Depends(get_session),
+    agent: Agent = Depends(get_current_agent),
+):
+    """Explicit reopen action (§3.5): same permission and window rules as PATCH /status
+    targeting REOPENED (both go through transition(), so they can't diverge).
+    """
+    ticket = _get_ticket(session, ticket_id, lock=True)
+    if not may_change_status(ticket, agent, TicketStatus.REOPENED):
+        session.rollback()
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "Only the assignee or an admin can reopen this ticket."
+        )
+    try:
+        reopen(session, ticket, Actor.agent(agent.id))
+    except InvalidTransition as e:
+        session.rollback()
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            {"message": str(e), "from": e.from_status.value, "allowed": e.allowed},
+        )
+    except ReopenWindowExpired as e:
+        session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, _reopen_expired_message(e))
+    session.commit()
+    return ticket
+
+
 @router.post("/{ticket_id}/replies", response_model=MessageOut, status_code=201)
 def reply(
     ticket_id: int,
@@ -318,6 +370,11 @@ def reply(
             "Only the assignee can reply. Take the ticket first."
             if ticket.assignee_id is None
             else "Only the assignee can reply.",
+        )
+    except TicketClosed:
+        session.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "This ticket is closed. Reopen it before replying."
         )
     session.commit()
     session.refresh(ticket, ["messages"])

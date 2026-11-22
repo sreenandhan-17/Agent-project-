@@ -73,8 +73,13 @@ export const publicApi = {
   },
   view: (token: string) =>
     call<CustomerTicketView>(`/api/public/tickets/${encodeURIComponent(token)}`, 'GET'),
+  /** `token` is usually the same one passed in, but differs when the reply landed on a new
+   * follow-up ticket instead (§3.5, more than 7 days after resolution) — callers must redirect
+   * there rather than keep showing the old ticket under its old URL. */
   reply: (token: string, body: string) =>
-    call<CustomerTicketView>(`/api/public/tickets/${encodeURIComponent(token)}/replies`, 'POST', {
-      body,
-    }),
+    call<{ token: string; ticket: CustomerTicketView }>(
+      `/api/public/tickets/${encodeURIComponent(token)}/replies`,
+      'POST',
+      { body },
+    ),
 }

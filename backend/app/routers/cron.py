@@ -7,8 +7,11 @@ CRON_SECRET, so this also doubles as a manual trigger for anyone who holds the s
 import hmac
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.db import get_session
+from app.services.tickets import auto_close_overdue_tickets
 
 router = APIRouter(prefix="/api/cron", tags=["cron"])
 
@@ -21,9 +24,10 @@ def require_cron_secret(authorization: str | None = Header(default=None)) -> Non
 
 
 @router.get("/auto-close", dependencies=[Depends(require_cron_secret)])
-def auto_close() -> dict:
-    """STUB (build step 7). Will close WAITING_ON_CUSTOMER/RESOLVED tickets after 5 working
-    days of no customer reply, with actor=system (§3.4). For now this only confirms the cron
-    is wired up correctly end-to-end (auth, schedule, deploy) and does nothing to the data.
+def auto_close(session: Session = Depends(get_session)) -> dict:
+    """Close WAITING_ON_CUSTOMER/RESOLVED tickets with no customer reply for 5 working days,
+    actor=system (§3.4). Idempotent: safe to run more than once or more often than scheduled.
     """
-    return {"status": "ok", "closed": 0, "note": "auto-close logic not yet implemented (step 7)"}
+    closed = auto_close_overdue_tickets(session)
+    session.commit()
+    return {"status": "ok", "closed": len(closed), "ticket_ids": [t.id for t in closed]}

@@ -2,7 +2,7 @@
 
 One file per issue, numbered in the order found. Resolved issues stay listed with ✅.
 
-**Status after step 6:** 241 backend tests passing, frontend builds, no errors. **Live:** https://frontdesk-mu-neon.vercel.app
+**Status after step 7:** 277 backend tests passing, frontend builds, no errors. **Live:** https://frontdesk-mu-neon.vercel.app (git-connected: pushes to `main` auto-deploy)
 
 | # | Issue | Found | Severity | Status / fixed in |
 |---|---|---|---|---|
@@ -14,7 +14,7 @@ One file per issue, numbered in the order found. Resolved issues stay listed wit
 | 06 | ~~[No Vercel entrypoint yet](06-vercel-entrypoint.md)~~ | Step 1 | Deploy blocker | ✅ Resolved (step 6) |
 | 07 | [No README / local setup docs](07-readme-missing.md) | Step 1 | Deliverable | Step 8 |
 | 08 | ~~[Endpoints trust an `X-Agent-Id` header](08-temporary-agent-header-auth.md)~~ | Step 3 | 🔴 Security | ✅ Resolved (step 4) |
-| 09 | [7-day reopen window not enforced](09-reopen-window-not-enforced.md) | Step 3 | 🟠 Rule gap | Step 7 |
+| 09 | ~~[7-day reopen window not enforced](09-reopen-window-not-enforced.md)~~ | Step 3 | 🟠 Rule gap | ✅ Resolved (step 7) |
 | 10 | ~~[Any agent can change any ticket's status/priority](10-who-may-change-status.md)~~ | Step 3 | 🟡 Decision needed | ✅ Resolved (option 2) |
 | 11 | ~~[Stored deadlines ignore the current pause](11-stored-deadlines-during-pause.md)~~ | Step 3 | 🟡 Late filter | ✅ Resolved (step 5) |
 | 12 | ~~[`first_response_at` is never set](12-first-response-at-never-set.md)~~ | Step 3 | 🟠 Rule gap | ✅ Resolved (step 4) |
@@ -22,9 +22,10 @@ One file per issue, numbered in the order found. Resolved issues stay listed wit
 | 14 | [Public submission has no rate limit](14-public-endpoint-abuse.md) | Step 4 | 🟠 Abuse risk | 🟡 Honeypot done; rate limit open |
 | 15 | ~~[Customer tickets default to MEDIUM](15-customer-ticket-default-priority.md)~~ | Step 4 | 🟡 Decision needed | ✅ Resolved (option 1 + impact hint) |
 | 16 | ~~[Where the frontend keeps the JWT](16-frontend-token-storage.md)~~ | Step 4 | 🟡 Design | ✅ Resolved (step 5, sessionStorage) |
-| 17 | [Replies accepted on RESOLVED/CLOSED tickets](17-messages-on-closed-tickets.md) | Step 4 | 🟡 Rule gap | Step 7 |
+| 17 | ~~[Replies accepted on RESOLVED/CLOSED tickets](17-messages-on-closed-tickets.md)~~ | Step 4 | 🟡 Rule gap | ✅ Resolved (step 7, block) |
 | 18 | ~~[No customer-facing web pages; email link points nowhere](18-no-customer-web-pages.md)~~ | Step 5 | 🟠 Demo gap | ✅ Resolved (/new, /t/:token) |
 | 19 | [Ticket list capped at 200 rows, no pagination](19-ticket-list-capped-at-200.md) | Step 5 | 🟡 Truncation | Later / note |
 | 20 | [`vercel link` fails on this machine (Windows symlink)](20-vercel-link-windows-symlink.md) | Step 6 | 🟡 Local tooling | Worked around |
+| 21 | [Customer viewing an old ticket sees no follow-up indicator](21-customer-view-no-followup-indicator.md) | Step 7 | 🟡 Minor UX gap | Open |
 
-**Next:** [NEXT-STEP.md](NEXT-STEP.md): build step 7, auto-close + reopen window.
+**Next:** [NEXT-STEP.md](NEXT-STEP.md): build step 8, README + "what I didn't finish" note.

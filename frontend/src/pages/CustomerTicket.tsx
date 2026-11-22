@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 
 import { formatIST } from '../format'
 import { PublicApiError, publicApi, type CustomerTicketView } from '../publicApi'
@@ -18,6 +18,7 @@ const STATUS: Record<CustomerTicketView['status'], { label: string; style: strin
 /** /t/:token: renders ONLY the CustomerTicketView the server returns (public messages). */
 export default function CustomerTicket() {
   const token = useParams().token ?? ''
+  const navigate = useNavigate()
   const [ticket, setTicket] = useState<CustomerTicketView | null>(null)
   const [state, setState] = useState<'loading' | 'ok' | 'not-found' | 'error'>('loading')
   const [reply, setReply] = useState('')
@@ -48,7 +49,13 @@ export default function CustomerTicket() {
     setBusy(true)
     setError(null)
     try {
-      setTicket(await publicApi.reply(token, reply.trim()))
+      const result = await publicApi.reply(token, reply.trim())
+      if (result.token !== token) {
+        // More than 7 days since resolution (§3.5): the reply opened a new, linked ticket.
+        navigate(`/t/${result.token}`, { replace: true })
+        return
+      }
+      setTicket(result.ticket)
       setReply('')
     } catch (err) {
       setError(err instanceof PublicApiError ? err.message : 'Could not send. Please try again.')

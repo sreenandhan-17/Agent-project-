@@ -74,12 +74,14 @@
 - A cron job closes tickets in `WAITING_ON_CUSTOMER` or `RESOLVED` after **5 working days** (2,700 working minutes) with no customer reply. The clock counts from `paused_at` or `resolved_at`.
 - The job sets the status to `CLOSED` and writes an `AUTO_CLOSED` audit event with **actor = system**.
 - The job is idempotent and safe to run more than once.
+- **Implemented:** `services/tickets.py: auto_close_overdue_tickets()`, called by `GET /api/cron/auto-close` (Vercel Cron, daily). Idempotency works because a closed ticket's status no longer matches the query on the next run — no separate "already processed" flag needed.
 
 ### 3.5 Reopen
 
 - A `RESOLVED` or `CLOSED` ticket can be reopened (by a customer reply or by an agent) **within 7 calendar days of `resolved_at`**. The status becomes `REOPENED`, `reopen_count` goes up by 1, and a new resolution deadline is computed from the reopen time using the same priority.
 - After 7 days, a customer reply creates a **new ticket** with `parent_ticket_id` pointing to the old one. Both tickets get audit events, and the UI links them.
 - Tickets that were closed without ever being resolved (for example, auto-closed while waiting) follow the same rule, measured from `closed_at`.
+- **Implemented:** the window check lives inside `transition()` itself (raises `ReopenWindowExpired` targeting `REOPENED`), so `PATCH /status`, `POST /reopen` and customer replies all enforce it identically — there's exactly one code path, not three that could drift apart. Only the resolution deadline is recomputed on reopen; `first_response_at`/`first_response_due_at` are left as they were (that target was already met earlier in the ticket's life). A customer reply past the window creates a follow-up via `create_follow_up()`; an agent past the window just gets a clear 409 (agents have no auto-follow-up path).
 
 ### 3.6 Priority change mid-way
 
@@ -191,11 +193,11 @@ All routes are under `/api`. Agent routes require a JWT. Public routes use the t
 - `GET /api/tickets/{id}`: detail including internal notes, SLA state and linked tickets
 - `GET /api/tickets/{id}/timeline`: audit events
 - `POST /api/tickets/{id}/claim`: atomic claim, returns 200 or 409
-- `POST /api/tickets/{id}/replies`: PUBLIC reply, assignee only (403 otherwise)
+- `POST /api/tickets/{id}/replies`: PUBLIC reply, assignee only (403 otherwise); 409 if the ticket is CLOSED (reopen first — RESOLVED is still allowed)
 - `POST /api/tickets/{id}/notes`: INTERNAL note, any agent
 - `PATCH /api/tickets/{id}/status`: `{ "status": ... }`, validated transition
 - `PATCH /api/tickets/{id}/priority`: recomputes deadlines (§3.6)
-- `POST /api/tickets/{id}/reopen`: within 7 days; otherwise the response points to creating a follow-up
+- `POST /api/tickets/{id}/reopen`: within 7 calendar days of resolution/closure (409 otherwise). Same rule as `PATCH /status` targeting `REOPENED` — both go through the same `transition()` logic, so they can't diverge. Agents don't get an auto-created follow-up; only customer replies do (see below)
 - `GET /api/tickets/{id}/export`: customer transcript (customer serializer, no internal notes)
 
 **Public (customer-facing)**
@@ -278,5 +280,5 @@ vercel.json        rewrites + cron schedule
 - [x] 4. Atomic claim (409) + PUBLIC/INTERNAL separation + leak test
 - [x] 5. Agent UI (list, filters, SLA badges, detail, timeline, reply/note boxes)
 - [x] 6. Deploy to Vercel + Neon, live URL working
-- [ ] 7. Auto-close cron + reopen window + follow-up tickets
+- [x] 7. Auto-close cron + reopen window + follow-up tickets
 - [ ] 8. README + "what I didn't finish" note
