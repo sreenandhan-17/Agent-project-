@@ -2,7 +2,7 @@
 
 One file per issue, numbered in the order found. Resolved issues stay listed with ✅.
 
-**Status after step 4 + notes 10, 13:** 161 tests passing, no errors.
+**Status after step 4 + notes 10, 13, 15:** 177 tests passing, no errors.
 
 | # | Issue | Found | Severity | Status / fixed in |
 |---|---|---|---|---|
@@ -20,7 +20,7 @@ One file per issue, numbered in the order found. Resolved issues stay listed wit
 | 12 | ~~[`first_response_at` is never set](12-first-response-at-never-set.md)~~ | Step 3 | 🟠 Rule gap | ✅ Resolved (step 4) |
 | 13 | ~~[`JWT_SECRET` falls back to a hard-coded default](13-jwt-secret-default.md)~~ | Step 4 | 🔴 Security | ✅ Resolved |
 | 14 | [Public submission has no rate limit](14-public-endpoint-abuse.md) | Step 4 | 🟠 Abuse risk | Step 6 / note |
-| 15 | [Customer tickets default to MEDIUM](15-customer-ticket-default-priority.md) | Step 4 | 🟡 Decision needed | Step 5 |
+| 15 | ~~[Customer tickets default to MEDIUM](15-customer-ticket-default-priority.md)~~ | Step 4 | 🟡 Decision needed | ✅ Resolved (option 1 + impact hint) |
 | 16 | [Where the frontend keeps the JWT](16-frontend-token-storage.md) | Step 4 | 🟡 Design | Step 5 |
 | 17 | [Replies accepted on RESOLVED/CLOSED tickets](17-messages-on-closed-tickets.md) | Step 4 | 🟡 Rule gap | Step 7 |
 

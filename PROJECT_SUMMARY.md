@@ -42,6 +42,15 @@
 - 1 working day = 540 working minutes (09:30–18:30).
 - **First reply** = the first **PUBLIC** agent message. Internal notes do not count.
 - *Assumption:* for URGENT, if the end of the working day comes before the first-reply deadline (for example, a ticket created at 17:45), the resolution deadline becomes the first-reply deadline, so resolution is never due before the first reply.
+- **Who sets priority (decision, notes/15):** customers don't. A ticket submitted on the public form:
+  - starts at **MEDIUM**, so the SLA clock runs on the MEDIUM targets from submission;
+  - has `needs_triage = true`;
+  - records the customer's stated **impact** (`customer_impact`, required on the form): `CANNOT_WORK` ("I can't work"), `PARTIAL` ("partly affected") or `QUESTION` ("just a question"). The impact is a **hint for agents only**: it never changes priority or deadlines automatically, and customers never see it or the priority.
+  - **Triage = any agent's `PATCH /priority`.** It always clears `needs_triage`:
+    - With a new priority, deadlines are recomputed from `created_at` (§3.6) and the change is audited as `PRIORITY_CHANGED`, with the old and new priority, flag and deadlines.
+    - Confirming the current priority only clears the flag and is audited as `TRIAGED`.
+  - Agent-created and seeded non-NEW tickets have `needs_triage = false` and no impact.
+  - The ticket list returns `needs_triage` and `customer_impact`, and can filter with `?needs_triage=true`.
 
 ### 3.2 Working time only
 
@@ -157,13 +166,14 @@ Any other transition returns **HTTP 422**. All transitions go through one functi
 - `paused_at` (nullable), `paused_minutes` (int, default 0)
 - `last_customer_reply_at`, `resolved_at`, `closed_at`, `reopen_count`
 - `parent_ticket_id` (FK to tickets, nullable, for follow-ups after the reopen window)
+- `needs_triage` (bool, default false; true for customer-submitted tickets until an agent sets priority; partial index), `customer_impact` (`CANNOT_WORK` | `PARTIAL` | `QUESTION`, nullable): see §3.1
 - `public_token` (unguessable token for the customer view)
 - Indexes on `(status)`, `(assignee_id)`, `(resolution_due_at)`
 
 **messages:** `id`, `ticket_id` (FK), `author_type` (`AGENT` | `CUSTOMER` | `SYSTEM`), `author_agent_id`, `author_customer_id`, `visibility` (`PUBLIC` | `INTERNAL`), `body`, `created_at`
 
 **audit_events** (append-only): `id`, `ticket_id` (nullable), `actor_type` (`AGENT` | `CUSTOMER` | `SYSTEM`), `actor_id` (nullable for system), `action`, `field`, `old_value` (jsonb), `new_value` (jsonb), `created_at` (`DEFAULT now()`, set by the server)
-- Actions: `TICKET_CREATED`, `CLAIMED`, `STATUS_CHANGED`, `PRIORITY_CHANGED`, `REPLY_SENT`, `NOTE_ADDED`, `CUSTOMER_REPLIED`, `SLA_PAUSED`, `SLA_RESUMED`, `AUTO_CLOSED`, `REOPENED`, `FOLLOW_UP_CREATED`
+- Actions: `TICKET_CREATED`, `CLAIMED`, `STATUS_CHANGED`, `PRIORITY_CHANGED`, `REPLY_SENT`, `NOTE_ADDED`, `CUSTOMER_REPLIED`, `SLA_PAUSED`, `SLA_RESUMED`, `AUTO_CLOSED`, `REOPENED`, `FOLLOW_UP_CREATED`, `TRIAGED`
 
 **holidays:** `date` (PK), `name`
 
@@ -176,7 +186,7 @@ All routes are under `/api`. Agent routes require a JWT. Public routes use the t
 - `GET /api/auth/me`
 
 **Agent: tickets**
-- `GET /api/tickets?view=mine|unassigned|late|waiting&status=&priority=&q=`: ticket list with SLA state
+- `GET /api/tickets?view=mine|unassigned|late|waiting&status=&priority=&needs_triage=&q=`: ticket list with SLA state, `needs_triage` and `customer_impact`
 - `POST /api/tickets`: agent logs a ticket on behalf of a customer (phone or WhatsApp intake)
 - `GET /api/tickets/{id}`: detail including internal notes, SLA state and linked tickets
 - `GET /api/tickets/{id}/timeline`: audit events

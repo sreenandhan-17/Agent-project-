@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_session
-from app.models import Ticket
+from app.models import CustomerImpact, Ticket
 from app.serializers.customer import CustomerTicketView, serialize_for_customer
 from app.services.tickets import add_customer_reply, create_customer_ticket
 
@@ -24,6 +24,7 @@ class NewTicketIn(BaseModel):
     company: str | None = Field(default=None, max_length=120)
     subject: str = Field(min_length=1, max_length=200)
     body: str = Field(min_length=1, max_length=10_000)
+    impact: CustomerImpact  # "I can't work" / "partly affected" / "just a question"
 
 
 class CustomerReplyIn(BaseModel):
@@ -55,6 +56,7 @@ def submit_ticket(body: NewTicketIn, session: Session = Depends(get_session)):
         company=body.company,
         subject=body.subject,
         body=body.body,
+        customer_impact=body.impact,
     )
     session.commit()
     session.refresh(ticket, ["messages"])

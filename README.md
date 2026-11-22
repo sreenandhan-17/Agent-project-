@@ -16,6 +16,11 @@ Business-rule choices that PROJECT_SUMMARY.md left open, and how they were settl
   - Moving a ticket from NEW to OPEN happens by claiming it, not through `PATCH /status`.
 - **Priority changes** (`PATCH /api/tickets/{id}/priority`): **any active agent**, so leads can triage unassigned tickets. Every change is audited with the old and new priority and deadlines.
 
+### Triage (who sets priority)
+- Customers **don't choose priority**. Public-form tickets start at **MEDIUM** with `needs_triage = true`, so the SLA clock runs from submission.
+- The form asks for **impact** (*I can't work* / *partly affected* / *just a question*). This is a hint for agents only and never changes priority automatically.
+- Any agent's priority change is the triage decision and clears the flag. Confirming the current priority is logged as `TRIAGED`; a new priority is logged as `PRIORITY_CHANGED`, with deadlines recomputed and possibly breached immediately.
+
 ### SLA
 - Working time is 09:30–18:30 Asia/Kolkata, Mon–Fri, excluding the 2026 Central Government gazetted holidays (DoPT list).
 - **URGENT "same working day":** resolve by 18:30 IST of the day the ticket starts counting, but never before the first-reply deadline (for example, a ticket created at 17:45 is due the next morning).

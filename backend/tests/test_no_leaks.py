@@ -29,7 +29,10 @@ COVERED_PUBLIC_ROUTES = {
 def submit(api, email="leak@test.example"):
     r = api.post(
         "/api/public/tickets",
-        json={"name": "Leak Tester", "email": email, "subject": "Printer on fire", "body": "Help"},
+        json={
+            "name": "Leak Tester", "email": email, "subject": "Printer on fire", "body": "Help",
+            "impact": "CANNOT_WORK",
+        },
     )
     assert r.status_code == 201, r.text
     return r

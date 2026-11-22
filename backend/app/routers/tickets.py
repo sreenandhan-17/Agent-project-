@@ -3,11 +3,20 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.deps import get_current_agent
-from app.models import Agent, AuthorType, Priority, Ticket, TicketStatus, Visibility
+from app.models import (
+    Agent,
+    AuthorType,
+    CustomerImpact,
+    Priority,
+    Ticket,
+    TicketStatus,
+    Visibility,
+)
 from app.serializers.customer import render_transcript, serialize_for_customer
 from app.services.audit import Actor
 from app.services.email import send_customer_email
@@ -59,6 +68,8 @@ class TicketOut(BaseModel):
     resolved_at: datetime | None
     closed_at: datetime | None
     reopen_count: int
+    needs_triage: bool
+    customer_impact: CustomerImpact | None
 
 
 class MessageOut(BaseModel):
@@ -81,6 +92,18 @@ def _get_ticket(session: Session, ticket_id: int, *, lock: bool = False) -> Tick
     if ticket is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "ticket not found")
     return ticket
+
+
+@router.get("", response_model=list[TicketOut])
+def list_tickets(
+    needs_triage: bool | None = None,
+    session: Session = Depends(get_session),
+):
+    """Agent ticket list, newest first. Views, filters and SLA badges come in step 5."""
+    stmt = select(Ticket).order_by(Ticket.created_at.desc(), Ticket.id.desc())
+    if needs_triage is not None:
+        stmt = stmt.where(Ticket.needs_triage.is_(needs_triage))
+    return session.scalars(stmt).all()
 
 
 @router.patch("/{ticket_id}/status", response_model=TicketOut)
@@ -116,7 +139,7 @@ def update_priority(
     session: Session = Depends(get_session),
     agent: Agent = Depends(get_current_agent),
 ):
-    # Any active agent may re-prioritise (triage); audited with old/new deadlines (§4).
+    # Any active agent may re-prioritise (triage); audited with old/new deadlines (Â§4).
     ticket = _get_ticket(session, ticket_id, lock=True)
     change_priority(session, ticket, body.priority, Actor.agent(agent.id))
     session.commit()

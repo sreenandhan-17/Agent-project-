@@ -1,4 +1,4 @@
-"""Build step 3: status transitions (§5), SLA pause/resume (§3.3), priority change (§3.6).
+"""Build step 3: status transitions (Â§5), SLA pause/resume (Â§3.3), priority change (Â§3.6).
 
 Reference week (Nov 2026): Fri 20, Sat 21, Sun 22, Mon 23, Tue 24, Wed 25, Thu 26, Fri 27.
 """
@@ -99,7 +99,7 @@ def test_reopen_counts_and_clears_resolution(session, make_ticket, actor):
     assert ticket.resolved_at is None and ticket.closed_at is None
 
 
-# --- SLA pause / resume (§3.3) -----------------------------------------------------------
+# --- SLA pause / resume (Â§3.3) -----------------------------------------------------------
 
 
 def test_waiting_pauses_the_clock(session, make_ticket, actor):
@@ -167,7 +167,7 @@ def test_system_actor_recorded_without_id(session, make_ticket):
     assert {(e.actor_type, e.actor_id) for e in events} == {(AuthorType.SYSTEM, None)}
 
 
-# --- Priority change (§3.6) --------------------------------------------------------------
+# --- Priority change (Â§3.6) --------------------------------------------------------------
 
 
 def test_priority_change_recomputes_from_created_at_and_can_breach(session, make_ticket, actor):
@@ -201,7 +201,9 @@ def test_priority_change_audits_old_and_new_deadlines(session, make_ticket, acto
     assert event.old_value["priority"] == "LOW"
     assert event.new_value["priority"] == "URGENT"
     assert event.old_value["first_response_due_at"] != event.new_value["first_response_due_at"]
-    assert set(event.new_value) == {"priority", "first_response_due_at", "resolution_due_at"}
+    assert set(event.new_value) == {
+        "priority", "needs_triage", "first_response_due_at", "resolution_due_at"
+    }
 
 
 def test_same_priority_is_a_no_op(session, make_ticket, actor):

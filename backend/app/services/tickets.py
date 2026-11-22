@@ -1,4 +1,4 @@
-"""Ticket state changes. See PROJECT_SUMMARY.md §3.3, §3.6, §4, §5.
+"""Ticket state changes. See PROJECT_SUMMARY.md Â§3.3, Â§3.6, Â§4, Â§5.
 
 Every status change goes through transition() (except the atomic claim, which sets NEW -> OPEN
 in its own UPDATE); every priority change through change_priority(). All functions write their
@@ -18,6 +18,7 @@ from app.models import (
     AuditAction,
     AuthorType,
     Customer,
+    CustomerImpact,
     Message,
     Priority,
     Ticket,
@@ -49,7 +50,7 @@ class InvalidTransition(Exception):
 
 
 def may_change_status(ticket: Ticket, agent: Agent, to_status: TicketStatus) -> bool:
-    """Agent permission for PATCH /status (§4, notes/10).
+    """Agent permission for PATCH /status (Â§4, notes/10).
 
     Assignee or ADMIN; plus any agent may close a NEW unassigned ticket (spam/duplicate).
     """
@@ -76,7 +77,7 @@ def _now(now: datetime | None) -> datetime:
 def _resume_sla(
     session: Session, ticket: Ticket, actor: Actor, now: datetime, holidays: set[date]
 ) -> None:
-    """Close the current pause: add its working minutes and shift deadlines by them (§3.3)."""
+    """Close the current pause: add its working minutes and shift deadlines by them (Â§3.3)."""
     paused = working_minutes_between(ticket.paused_at, now, holidays)
     old = {"paused_minutes": ticket.paused_minutes, **_deadlines(ticket)}
     ticket.paused_minutes = (ticket.paused_minutes or 0) + paused
@@ -135,20 +136,36 @@ def change_priority(
     *,
     holidays: set[date] | None = None,
 ) -> bool:
-    """Recompute deadlines from created_at with the new priority (§3.6). False if unchanged.
+    """Set priority; this is also the triage decision, so it always clears needs_triage (Â§3.1).
 
-    The new deadlines may already be in the past; the ticket is then breached immediately.
+    A new priority recomputes deadlines from created_at (Â§3.6) and may breach the ticket
+    immediately: audited as PRIORITY_CHANGED. Confirming the current priority on a ticket
+    that needs triage only clears the flag: audited as TRIAGED. Otherwise a no-op (False).
     """
-    if new_priority is ticket.priority:
+    changed = new_priority is not ticket.priority
+    if not changed and not ticket.needs_triage:
         return False
-    if holidays is None:
-        holidays = load_holidays(session)
 
-    old = {"priority": ticket.priority.value, **_deadlines(ticket)}
-    ticket.priority = new_priority
-    ticket.first_response_due_at, ticket.resolution_due_at = compute_deadlines(ticket, holidays)
-    new = {"priority": new_priority.value, **_deadlines(ticket)}
-    record(session, ticket.id, actor, AuditAction.PRIORITY_CHANGED, "priority", old, new)
+    def snapshot() -> dict:
+        return {
+            "priority": ticket.priority.value,
+            "needs_triage": ticket.needs_triage,
+            **_deadlines(ticket),
+        }
+
+    old = snapshot()
+    ticket.needs_triage = False
+    if changed:
+        if holidays is None:
+            holidays = load_holidays(session)
+        ticket.priority = new_priority
+        ticket.first_response_due_at, ticket.resolution_due_at = compute_deadlines(
+            ticket, holidays
+        )
+    action, field = (
+        (AuditAction.PRIORITY_CHANGED, "priority") if changed else (AuditAction.TRIAGED, "needs_triage")
+    )
+    record(session, ticket.id, actor, action, field, old, snapshot())
     return True
 
 
@@ -220,7 +237,7 @@ class NotAssignee(Exception):
 def add_reply(
     session: Session, ticket: Ticket, agent: Agent, body: str, *, now: datetime | None = None
 ) -> Message:
-    """PUBLIC reply. Assignee only (INC-0291). The first one sets first_response_at (§3.1)."""
+    """PUBLIC reply. Assignee only (INC-0291). The first one sets first_response_at (Â§3.1)."""
     if ticket.assignee_id != agent.id:
         raise NotAssignee()
     now = _now(now)
@@ -276,10 +293,15 @@ def create_customer_ticket(
     body: str,
     phone: str | None = None,
     company: str | None = None,
-    priority: Priority = Priority.MEDIUM,
+    customer_impact: CustomerImpact | None = None,
     now: datetime | None = None,
 ) -> Ticket:
-    """A ticket submitted by a customer. Finds or creates the customer by email."""
+    """A ticket submitted by a customer. Finds or creates the customer by email.
+
+    Customers don't choose priority: it starts at MEDIUM with needs_triage=True until an agent
+    sets it; their stated impact is only a hint (§3.1, notes/15).
+    """
+    priority = Priority.MEDIUM
     now = _now(now)
     email = email.strip().lower()
     customer = session.query(Customer).filter(Customer.email == email).one_or_none()
@@ -297,6 +319,8 @@ def create_customer_ticket(
         last_customer_reply_at=now,
         paused_minutes=0,
         reopen_count=0,
+        needs_triage=True,
+        customer_impact=customer_impact,
     )
     ticket.first_response_due_at, ticket.resolution_due_at = compute_deadlines(
         ticket, load_holidays(session)
@@ -315,7 +339,13 @@ def create_customer_ticket(
     )
     record(
         session, ticket.id, Actor.customer(customer.id), AuditAction.TICKET_CREATED, None, None,
-        {"subject": subject, "priority": priority.value, "status": TicketStatus.NEW.value},
+        {
+            "subject": subject,
+            "priority": priority.value,
+            "status": TicketStatus.NEW.value,
+            "needs_triage": True,
+            "customer_impact": customer_impact.value if customer_impact else None,
+        },
     )
     session.flush()
     return ticket
@@ -324,7 +354,7 @@ def create_customer_ticket(
 def add_customer_reply(
     session: Session, ticket: Ticket, body: str, *, now: datetime | None = None
 ) -> Message:
-    """Customer reply. Resumes the SLA clock if the ticket was waiting on the customer (§3.3).
+    """Customer reply. Resumes the SLA clock if the ticket was waiting on the customer (Â§3.3).
 
     Reopening resolved/closed tickets (7-day window) is build step 7 (notes/09).
     """

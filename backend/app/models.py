@@ -1,4 +1,4 @@
-"""Database models. See PROJECT_SUMMARY.md §6."""
+"""Database models. See PROJECT_SUMMARY.md Â§6."""
 
 import enum
 import secrets
@@ -68,6 +68,15 @@ class AuditAction(str, enum.Enum):
     AUTO_CLOSED = "AUTO_CLOSED"
     REOPENED = "REOPENED"
     FOLLOW_UP_CREATED = "FOLLOW_UP_CREATED"
+    TRIAGED = "TRIAGED"  # priority confirmed unchanged; clears needs_triage (§3.1)
+
+
+class CustomerImpact(str, enum.Enum):
+    """How badly the customer says they are affected (public form). A hint for triage only."""
+
+    CANNOT_WORK = "CANNOT_WORK"
+    PARTIAL = "PARTIAL"
+    QUESTION = "QUESTION"
 
 
 def _pg_enum(py_enum: type[enum.Enum], name: str) -> Enum:
@@ -146,6 +155,12 @@ class Ticket(Base):
     reopen_count: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
 
     parent_ticket_id: Mapped[int | None] = mapped_column(ForeignKey("tickets.id"))
+
+    # Triage (§3.1): customer tickets start at MEDIUM with needs_triage until an agent sets priority.
+    needs_triage: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    customer_impact: Mapped[CustomerImpact | None] = mapped_column(
+        _pg_enum(CustomerImpact, "customer_impact")
+    )
     public_token: Mapped[str] = mapped_column(String(64), unique=True, default=new_public_token)
 
     customer: Mapped[Customer] = relationship()

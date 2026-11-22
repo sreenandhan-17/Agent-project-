@@ -18,6 +18,7 @@ from app.models import (
     AuditAction,
     AuthorType,
     Customer,
+    CustomerImpact,
     Holiday,
     Message,
     Priority,
@@ -72,6 +73,12 @@ HOLIDAYS = [
     (date(2026, 11, 24), "Guru Nanak's Birthday"),
     (date(2026, 12, 25), "Christmas"),
 ]
+
+IMPACT_HINT = {
+    Priority.URGENT: CustomerImpact.CANNOT_WORK,
+    Priority.MEDIUM: CustomerImpact.PARTIAL,
+    Priority.LOW: CustomerImpact.QUESTION,
+}
 
 # (subject, customer index, priority, status, assignee index or None, hours ago)
 TICKETS = [
@@ -150,6 +157,10 @@ def seed_tickets(session: Session, agents: list[Agent], customers: list[Customer
             created_at=created,
             last_customer_reply_at=created,
         )
+        if status is TicketStatus.NEW:
+            # Untriaged customer submissions (§3.1): flag + the impact they reported.
+            ticket.needs_triage = True
+            ticket.customer_impact = IMPACT_HINT[priority]
         if status is TicketStatus.WAITING_ON_CUSTOMER:
             ticket.paused_at = created + timedelta(hours=1)
         if status in (TicketStatus.RESOLVED, TicketStatus.CLOSED, TicketStatus.REOPENED):

@@ -1,5 +1,7 @@
 # 15: Customer-submitted tickets default to MEDIUM priority
 
+> **✅ RESOLVED (decision: option 1 + impact hint).** Migration `0002` adds `tickets.needs_triage` (bool, default false, with a partial index), `tickets.customer_impact` (`CANNOT_WORK`/`PARTIAL`/`QUESTION`, nullable) and the audit action `TRIAGED`. Public-form tickets start at MEDIUM with `needs_triage=true`; impact is required on the form and is never shown to the customer. Any agent's `PATCH /priority` clears the flag: a new priority is audited as `PRIORITY_CHANGED`, confirming the current one as `TRIAGED`. `GET /api/tickets` returns both fields (`?needs_triage=true` filters). Recorded in PROJECT_SUMMARY.md §3.1/§6/§7 and the README. Tests: `tests/test_triage.py` (16).
+
 **Found in:** step 4
 **Severity:** 🟡 Decision needed
 **Fixed in:** step 5 (UI triage) or a quick decision
