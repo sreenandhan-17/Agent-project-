@@ -6,13 +6,21 @@ A support ticket system for Arvo Systems: 9 agents, ~40 tickets a day, replacing
 
 **https://frontdesk-mu-neon.vercel.app**
 
-| Role | How to get in |
-|---|---|
-| Admin agent | `ananya@arvo.example` / `frontdesk-agent` |
-| Agent | any of `rahul`, `priya`, `vikram`, `meera`, `arjun`, `sneha`, `karthik`, `divya` `@arvo.example` / `frontdesk-agent` |
-| Customer | no login — open [`/new`](https://frontdesk-mu-neon.vercel.app/new) |
+**Agent login credentials** (all 9, from `backend/seed.py`) — password is the same for every account:
 
-(All nine agents and their passwords come straight from `backend/seed.py`.)
+| Name | Email (login ID) | Role | Password |
+|---|---|---|---|
+| Ananya Rao | `ananya@arvo.example` | Admin | `frontdesk-agent` |
+| Rahul Menon | `rahul@arvo.example` | Agent | `frontdesk-agent` |
+| Priya Nair | `priya@arvo.example` | Agent | `frontdesk-agent` |
+| Vikram Shah | `vikram@arvo.example` | Agent | `frontdesk-agent` |
+| Meera Iyer | `meera@arvo.example` | Agent | `frontdesk-agent` |
+| Arjun Pillai | `arjun@arvo.example` | Agent | `frontdesk-agent` |
+| Sneha Kulkarni | `sneha@arvo.example` | Agent | `frontdesk-agent` |
+| Karthik Reddy | `karthik@arvo.example` | Agent | `frontdesk-agent` |
+| Divya Joshi | `divya@arvo.example` | Agent | `frontdesk-agent` |
+
+**Customer:** no login — open [`/new`](https://frontdesk-mu-neon.vercel.app/new) to submit a ticket.
 
 ## Try it in 5 minutes
 
