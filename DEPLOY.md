@@ -86,7 +86,10 @@ This builds the frontend (`cd frontend && npm ci && npm run build`) and uploads
   schedule firing all cron jobs once a day; see `vercel.json`). Today it's a stub that proves the
   schedule, auth and routing work — the real auto-close logic (5 working days, §3.4) is build
   step 7.
-- **Redeploying:** `npx vercel --prod` again picks up new commits. Migrations are **not** run
-  automatically — repeat §2 whenever a new Alembic revision needs to go live.
+- **Redeploying:** the Vercel project is Git-connected (GitHub App installed on
+  `sreenandhan-17/Agent-project-`, production branch `main`). Every push to `main` builds and
+  deploys automatically — no manual `vercel deploy` needed. Check progress with
+  `vercel list --project frontdesk` or the Vercel dashboard. Migrations are **not** run
+  automatically — repeat §2 whenever a new Alembic revision needs to go live, same as before.
 - **Rolling back:** use the Vercel dashboard's "Promote to Production" on a previous deployment,
   or `git revert` + redeploy. Database migrations are not automatically rolled back.
