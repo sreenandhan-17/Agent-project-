@@ -10,6 +10,14 @@
 > actually prevents the "_pg3_0 does not exist" failure against Neon's real PgBouncer pooler,
 > not just in theory. Local Docker Postgres (`frontdesk-pg`) is kept for day-to-day dev/tests;
 > it's unrelated to and doesn't block the live deployment anymore.
+>
+> **Update:** the Neon-Managed Vercel integration (Neon Console → Integrations → Vercel) was
+> also connected afterward, from the dashboard. It added its own `DATABASE_URL` /
+> `DATABASE_URL_UNPOOLED` as **Development**-environment Config vars (for local `vercel dev` /
+> `vercel env pull`, which this repo doesn't use) and one `DATABASE_URL_UNPOOLED` in
+> **Production**. It left the Production `DATABASE_URL` Secret set manually in this step
+> untouched. Re-confirmed live afterward: health, login, and the ticket list (11 tickets —
+> 10 seeded + the one from the step-6 smoke test — same database, no redeploy needed).
 
 **What:** The backend and tests currently use a local Docker container:
 - container `frontdesk-pg`, port **5433**, user and password `frontdesk`
