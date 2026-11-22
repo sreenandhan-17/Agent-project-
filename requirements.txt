@@ -1,0 +1,9 @@
+# Production dependencies for the Vercel Python function (api/index.py).
+# Dev/test tools (pytest, httpx, uvicorn, alembic) live in backend/requirements.txt.
+fastapi==0.115.*
+sqlalchemy==2.0.*
+psycopg[binary]==3.2.*
+pydantic-settings==2.6.*
+bcrypt==4.2.*
+pyjwt==2.10.*
+email-validator==2.*

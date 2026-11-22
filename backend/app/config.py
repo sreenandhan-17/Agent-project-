@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,10 +18,22 @@ _DEV_SECRETS = {
 
 
 def normalize_db_url(url: str) -> str:
-    """Neon hands out postgresql:// URLs; SQLAlchemy needs the psycopg 3 driver named."""
+    """Neon hands out postgresql:// URLs; SQLAlchemy needs the psycopg 3 driver named.
+
+    Also enforces sslmode=require for any non-local host (Neon's own connection strings
+    already include it, so this is a safety net if one is pasted in without it). Local
+    Docker Postgres (localhost/127.0.0.1) is left alone: it isn't configured for TLS.
+    """
     for prefix in ("postgres://", "postgresql://"):
         if url.startswith(prefix):
-            return "postgresql+psycopg://" + url[len(prefix):]
+            url = "postgresql+psycopg://" + url[len(prefix):]
+            break
+
+    parsed = urlsplit(url)
+    if parsed.hostname not in (None, "localhost", "127.0.0.1"):
+        query = dict(parse_qsl(parsed.query))
+        query.setdefault("sslmode", "require")
+        url = urlunsplit(parsed._replace(query=urlencode(query)))
     return url
 
 

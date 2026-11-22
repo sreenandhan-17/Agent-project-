@@ -22,3 +22,10 @@ Thumbs.db
 
 # browser test artefacts
 .playwright-mcp/
+
+# local Neon CLI link (org/project/branch ids only, no secrets)
+.neon
+
+# local Vercel CLI project link (not created by this repo's deploy flow, which uses
+# `vercel deploy --project frontdesk` instead of `vercel link`, but gitignore defensively)
+.vercel

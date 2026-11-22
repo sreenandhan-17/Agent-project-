@@ -265,6 +265,7 @@ vercel.json        rewrites + cron schedule
 ## 11. Deliverables
 
 - **Live URL** on Vercel, kept up for **1 week** after submission, with demo agent logins in the README.
+  **Live:** https://frontdesk-mu-neon.vercel.app (Vercel project `frontdesk` + Neon project `frontdesk`, region `aws-us-east-2`). See `DEPLOY.md`.
 - **Repository** with the full source.
 - **README:** local setup (Postgres, environment variables, `alembic upgrade head`, seed, run backend and frontend, run tests), deployment notes, and the business-rule decisions and assumptions from §3.
 - **Short note:** what was finished, what wasn't, and what I would do next.
@@ -276,6 +277,6 @@ vercel.json        rewrites + cron schedule
 - [x] 3. Status transitions, SLA pause/resume, priority recompute
 - [x] 4. Atomic claim (409) + PUBLIC/INTERNAL separation + leak test
 - [x] 5. Agent UI (list, filters, SLA badges, detail, timeline, reply/note boxes)
-- [ ] 6. Deploy to Vercel + Neon, live URL working
+- [x] 6. Deploy to Vercel + Neon, live URL working
 - [ ] 7. Auto-close cron + reopen window + follow-up tickets
 - [ ] 8. README + "what I didn't finish" note

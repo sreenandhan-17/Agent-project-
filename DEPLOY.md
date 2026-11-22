@@ -1,0 +1,92 @@
+# Deploying Frontdesk
+
+One Vercel project serves both halves: the React frontend as static files, and the FastAPI
+backend as a single Python serverless function (`api/index.py`). Postgres is Neon.
+
+## 1. Create the Neon database
+
+1. At https://console.neon.tech, create a project (pick a region close to your users; Vercel
+   serverless functions run in a single region by default — US East unless your project changes
+   it — so a Neon region close to that keeps query latency down, but any region works).
+2. On the project dashboard, click **Connect**.
+3. Copy the **pooled** connection string (toggle "Connection pooling" ON — the hostname
+   contains `-pooler`). This is your production `DATABASE_URL`.
+4. Toggle pooling **OFF** and copy that string too — the **direct** connection. You only use
+   this once, from your own machine, to run migrations (§2 below). Never put it in Vercel.
+
+Both strings look like:
+```
+postgresql://<user>:<password>@<host>/<dbname>?sslmode=require
+```
+only the host differs (`...-pooler...` vs `...` without it).
+
+## 2. Run migrations and seed (from your machine, using the DIRECT url)
+
+```bash
+cd backend
+# Temporarily point at Neon directly — do not edit .env; pass it inline so it never lingers.
+DATABASE_URL="<paste the DIRECT connection string>" ./venv/Scripts/alembic upgrade head
+DATABASE_URL="<paste the DIRECT connection string>" ./venv/Scripts/python seed.py
+```
+(PowerShell: `$env:DATABASE_URL="..."; .\venv\Scripts\alembic upgrade head`, then unset it after:
+`Remove-Item Env:DATABASE_URL`.)
+
+Migrations go through the direct connection because Alembic's DDL (`CREATE TYPE`, trigger
+functions) doesn't play well with PgBouncer's transaction-pooling mode that Neon's pooler uses.
+The app itself (runtime queries) uses the **pooled** URL once deployed.
+
+## 3. Generate secrets
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"   # run twice: once each for JWT_SECRET and CRON_SECRET
+```
+Each must be at least 32 characters (enforced at startup — see `notes/13`).
+
+## 4. Create the Vercel project and set environment variables
+
+Via the dashboard (https://vercel.com/new) or `vercel link` from the repo root, then set these
+**Production** environment variables (Project → Settings → Environment Variables):
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | Neon **pooled** connection string (§1) |
+| `JWT_SECRET` | from §3 |
+| `CRON_SECRET` | from §3 — **must be named exactly `CRON_SECRET`**: Vercel auto-sends it as `Authorization: Bearer $CRON_SECRET` to cron-triggered requests |
+| `ENV` | `production` (anything other than the literal string `dev` works the same — see `app/config.py`) |
+| `PUBLIC_BASE_URL` | optional — leave unset and the app falls back to `https://$VERCEL_PROJECT_PRODUCTION_URL`, which Vercel sets automatically. Set it explicitly once you attach a custom domain. |
+
+Do **not** set `TEST_DATABASE_URL` in Vercel — tests never run there.
+
+## 5. Deploy
+
+```bash
+npx vercel --prod
+```
+This builds the frontend (`cd frontend && npm ci && npm run build`) and uploads
+`api/index.py` as a Python function per `vercel.json`.
+
+## 6. Smoke-test the live URL
+
+| Check | How |
+|---|---|
+| Health | `curl https://<url>/api/health` → `{"status":"ok","db":true}` |
+| Agent login | Log in at `/login` as `ananya@arvo.example` / `frontdesk-demo` |
+| Ticket list | Loads with SLA badges |
+| Claim a ticket | "Take ticket" succeeds, assignee updates |
+| Reply | Assignee sends a public reply |
+| Internal note | Add a note; confirm it's yellow and never appears in the customer view |
+| Customer portal | `/new` → submit → redirects to `/t/<token>` |
+| No leaks | On `/t/<token>`, confirm the internal note's text is **not** present anywhere in the page or its network responses |
+| SPA reload | Reload `/tickets/9` and `/t/<token>` directly (not just by clicking) — should **not** 404 |
+| Cron auth | `curl -i https://<url>/api/cron/auto-close` → `401`; with the real `CRON_SECRET` as a Bearer token → `200` |
+
+## Notes
+
+- **Cron:** `/api/cron/auto-close` runs daily at 03:30 UTC (Vercel Hobby plan allows at most one
+  schedule firing all cron jobs once a day; see `vercel.json`). Today it's a stub that proves the
+  schedule, auth and routing work — the real auto-close logic (5 working days, §3.4) is build
+  step 7.
+- **Redeploying:** `npx vercel --prod` again picks up new commits. Migrations are **not** run
+  automatically — repeat §2 whenever a new Alembic revision needs to go live.
+- **Rolling back:** use the Vercel dashboard's "Promote to Production" on a previous deployment,
+  or `git revert` + redeploy. Database migrations are not automatically rolled back.

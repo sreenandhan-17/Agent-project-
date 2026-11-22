@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.db import get_session
-from app.routers import agents, auth, public, tickets
+from app.routers import agents, auth, cron, public, tickets
 
 # Fail at startup, not on the first login, if secrets are missing or weak (notes/13).
 get_settings()
@@ -16,6 +16,7 @@ app.include_router(auth.router)
 app.include_router(agents.router)
 app.include_router(tickets.router)
 app.include_router(public.router)
+app.include_router(cron.router)
 
 
 @app.get("/api/health")
