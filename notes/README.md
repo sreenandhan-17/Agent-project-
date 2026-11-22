@@ -18,7 +18,7 @@ One file per issue, numbered in the order found. Resolved issues stay listed wit
 | 10 | ~~[Any agent can change any ticket's status/priority](10-who-may-change-status.md)~~ | Step 3 | 🟡 Decision needed | ✅ Resolved (option 2) |
 | 11 | [Stored deadlines ignore the current pause](11-stored-deadlines-during-pause.md) | Step 3 | 🟡 Late filter | Step 5 |
 | 12 | ~~[`first_response_at` is never set](12-first-response-at-never-set.md)~~ | Step 3 | 🟠 Rule gap | ✅ Resolved (step 4) |
-| 13 | [`JWT_SECRET` falls back to a hard-coded default](13-jwt-secret-default.md) | Step 4 | 🔴 Security | Step 6, before deploy |
+| 13 | ~~[`JWT_SECRET` falls back to a hard-coded default](13-jwt-secret-default.md)~~ | Step 4 | 🔴 Security | ✅ Resolved |
 | 14 | [Public submission has no rate limit](14-public-endpoint-abuse.md) | Step 4 | 🟠 Abuse risk | Step 6 / note |
 | 15 | [Customer tickets default to MEDIUM](15-customer-ticket-default-priority.md) | Step 4 | 🟡 Decision needed | Step 5 |
 | 16 | [Where the frontend keeps the JWT](16-frontend-token-storage.md) | Step 4 | 🟡 Design | Step 5 |
