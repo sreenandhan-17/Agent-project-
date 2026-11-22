@@ -26,10 +26,18 @@ only the host differs (`...-pooler...` vs `...` without it).
 cd backend
 # Temporarily point at Neon directly — do not edit .env; pass it inline so it never lingers.
 DATABASE_URL="<paste the DIRECT connection string>" ./venv/Scripts/alembic upgrade head
-DATABASE_URL="<paste the DIRECT connection string>" ./venv/Scripts/python seed.py
+DATABASE_URL="<paste the DIRECT connection string>" SEED_AGENT_PASSWORD="<pick a password>" \
+  ./venv/Scripts/python seed.py
 ```
-(PowerShell: `$env:DATABASE_URL="..."; .\venv\Scripts\alembic upgrade head`, then unset it after:
-`Remove-Item Env:DATABASE_URL`.)
+(PowerShell: `$env:DATABASE_URL="..."; .\venv\Scripts\alembic upgrade head`, then
+`$env:DATABASE_URL="..."; $env:SEED_AGENT_PASSWORD="..."; .\venv\Scripts\python seed.py`, then
+unset both after: `Remove-Item Env:DATABASE_URL; Remove-Item Env:SEED_AGENT_PASSWORD`.)
+
+**`SEED_AGENT_PASSWORD` is never committed anywhere.** Pick a password, pass it inline exactly
+like `DATABASE_URL` above, and share it with whoever needs to log in through a private channel
+— not in this repo, not in a commit message, not in an issue. If the password is ever
+accidentally committed or otherwise exposed, re-run this step with a new value: `seed.py`
+resets every existing agent's password to whatever you pass it, so rotating is just a re-run.
 
 Migrations go through the direct connection because Alembic's DDL (`CREATE TYPE`, trigger
 functions) doesn't play well with PgBouncer's transaction-pooling mode that Neon's pooler uses.
@@ -70,7 +78,7 @@ This builds the frontend (`cd frontend && npm ci && npm run build`) and uploads
 | Check | How |
 |---|---|
 | Health | `curl https://<url>/api/health` → `{"status":"ok","db":true}` |
-| Agent login | Log in at `/login` as `ananya@arvo.example` / `frontdesk-agent` |
+| Agent login | Log in at `/login` as `ananya@arvo.example` with the password you passed to `SEED_AGENT_PASSWORD` in §2 |
 | Ticket list | Loads with SLA badges |
 | Claim a ticket | "Take ticket" succeeds, assignee updates |
 | Reply | Assignee sends a public reply |
