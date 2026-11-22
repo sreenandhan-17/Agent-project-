@@ -1,5 +1,7 @@
 # 03: Deprecation warning in pytest output
 
+> **✅ RESOLVED.** Silenced with `filterwarnings` in `backend/pytest.ini`. pytest now reports `42 passed` with no warnings.
+
 **What:** `6 passed, 1 warning`. The warning comes from inside Starlette's `TestClient`:
 `DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated`.
 

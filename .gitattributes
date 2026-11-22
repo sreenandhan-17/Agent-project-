@@ -1,0 +1,5 @@
+# Store text as LF in the repo and checkout (Vercel builds on Linux). See notes/04.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

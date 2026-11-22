@@ -50,18 +50,26 @@ CUSTOMERS = [
     ("Lakshmi Krishnan", "lakshmi@orbitclinics.example", "+91 97400 66778", "Orbit Clinics"),
 ]
 
-# 2026 holidays. Fixed-date ones are certain; festival dates follow the lunar calendar,
-# so check them against Arvo's official holiday list before relying on them.
+# 2026 gazetted holidays for Central Government offices (DoPT OM F.No.12/2/2023-JCA, 03-07-2025).
+# Source: https://dfe.gov.in/uploads/documents/list-of-gazetted-holidays-2026.pdf
+# Replace with Arvo's own holiday list if it differs.
 HOLIDAYS = [
     (date(2026, 1, 26), "Republic Day"),
     (date(2026, 3, 4), "Holi"),
-    (date(2026, 3, 20), "Id-ul-Fitr"),
+    (date(2026, 3, 21), "Id-ul-Fitr"),
+    (date(2026, 3, 26), "Ram Navami"),
+    (date(2026, 3, 31), "Mahavir Jayanti"),
     (date(2026, 4, 3), "Good Friday"),
-    (date(2026, 5, 1), "Labour Day"),
+    (date(2026, 5, 1), "Buddha Purnima"),
+    (date(2026, 5, 27), "Id-ul-Zuha (Bakrid)"),
+    (date(2026, 6, 26), "Muharram"),
     (date(2026, 8, 15), "Independence Day"),
+    (date(2026, 8, 26), "Milad-un-Nabi"),
+    (date(2026, 9, 4), "Janmashtami"),
     (date(2026, 10, 2), "Gandhi Jayanti"),
     (date(2026, 10, 20), "Dussehra"),
-    (date(2026, 11, 9), "Diwali"),
+    (date(2026, 11, 8), "Diwali"),
+    (date(2026, 11, 24), "Guru Nanak's Birthday"),
     (date(2026, 12, 25), "Christmas"),
 ]
 
@@ -113,12 +121,16 @@ def seed_customers(session: Session) -> list[Customer]:
 
 
 def seed_holidays(session: Session) -> int:
-    existing = set(session.scalars(select(Holiday.date)))
+    """Insert missing holidays and correct names of existing ones. Never deletes."""
+    existing = {h.date: h for h in session.scalars(select(Holiday))}
     added = 0
     for day, name in HOLIDAYS:
-        if day not in existing:
+        holiday = existing.get(day)
+        if holiday is None:
             session.add(Holiday(date=day, name=name))
             added += 1
+        elif holiday.name != name:
+            holiday.name = name
     return added
 
 
