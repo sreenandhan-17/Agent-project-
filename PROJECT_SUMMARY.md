@@ -281,4 +281,4 @@ vercel.json        rewrites + cron schedule
 - [x] 5. Agent UI (list, filters, SLA badges, detail, timeline, reply/note boxes)
 - [x] 6. Deploy to Vercel + Neon, live URL working
 - [x] 7. Auto-close cron + reopen window + follow-up tickets
-- [ ] 8. README + "what I didn't finish" note
+- [x] 8. README + "what I didn't finish" note

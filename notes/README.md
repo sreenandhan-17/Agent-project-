@@ -2,7 +2,7 @@
 
 One file per issue, numbered in the order found. Resolved issues stay listed with ✅.
 
-**Status after step 7:** 277 backend tests passing, frontend builds, no errors. **Live:** https://frontdesk-mu-neon.vercel.app (git-connected: pushes to `main` auto-deploy)
+**Status after step 8 (build complete):** 277 backend tests passing, frontend builds, no errors. **Live:** https://frontdesk-mu-neon.vercel.app (git-connected: pushes to `main` auto-deploy)
 
 | # | Issue | Found | Severity | Status / fixed in |
 |---|---|---|---|---|
@@ -12,7 +12,7 @@ One file per issue, numbered in the order found. Resolved issues stay listed wit
 | 04 | ~~[Line-ending (CRLF) warnings on commit](04-line-endings.md)~~ | Step 1 | Cosmetic | ✅ Resolved (after step 2) |
 | 05 | ~~[Local dev depends on Docker; Neon not set up](05-database-local-vs-neon.md)~~ | Step 1 | Deploy blocker | ✅ Resolved (step 6) |
 | 06 | ~~[No Vercel entrypoint yet](06-vercel-entrypoint.md)~~ | Step 1 | Deploy blocker | ✅ Resolved (step 6) |
-| 07 | [No README / local setup docs](07-readme-missing.md) | Step 1 | Deliverable | Step 8 |
+| 07 | ~~[No README / local setup docs](07-readme-missing.md)~~ | Step 1 | Deliverable | ✅ Resolved (step 8) |
 | 08 | ~~[Endpoints trust an `X-Agent-Id` header](08-temporary-agent-header-auth.md)~~ | Step 3 | 🔴 Security | ✅ Resolved (step 4) |
 | 09 | ~~[7-day reopen window not enforced](09-reopen-window-not-enforced.md)~~ | Step 3 | 🟠 Rule gap | ✅ Resolved (step 7) |
 | 10 | ~~[Any agent can change any ticket's status/priority](10-who-may-change-status.md)~~ | Step 3 | 🟡 Decision needed | ✅ Resolved (option 2) |
@@ -28,4 +28,4 @@ One file per issue, numbered in the order found. Resolved issues stay listed wit
 | 20 | [`vercel link` fails on this machine (Windows symlink)](20-vercel-link-windows-symlink.md) | Step 6 | 🟡 Local tooling | Worked around |
 | 21 | [Customer viewing an old ticket sees no follow-up indicator](21-customer-view-no-followup-indicator.md) | Step 7 | 🟡 Minor UX gap | Open |
 
-**Next:** [NEXT-STEP.md](NEXT-STEP.md): build step 8, README + "what I didn't finish" note.
+**Next:** none — all 8 build steps are done (`PROJECT_SUMMARY.md`'s checklist is fully ticked). `notes/14`, `19`, and `21` remain open as known, documented gaps (see the README's "What I didn't finish" section); `notes/20` is a local-tooling quirk, already worked around.

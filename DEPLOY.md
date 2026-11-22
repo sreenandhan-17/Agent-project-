@@ -83,9 +83,9 @@ This builds the frontend (`cd frontend && npm ci && npm run build`) and uploads
 ## Notes
 
 - **Cron:** `/api/cron/auto-close` runs daily at 03:30 UTC (Vercel Hobby plan allows at most one
-  schedule firing all cron jobs once a day; see `vercel.json`). Today it's a stub that proves the
-  schedule, auth and routing work — the real auto-close logic (5 working days, §3.4) is build
-  step 7.
+  schedule firing all cron jobs once a day; see `vercel.json`). It closes `WAITING_ON_CUSTOMER`/
+  `RESOLVED` tickets after 5 working days of no customer reply (§3.4, step 7) — idempotent, so
+  it's also safe to trigger manually with the `CRON_SECRET` bearer token between scheduled runs.
 - **Redeploying:** the Vercel project is Git-connected (GitHub App installed on
   `sreenandhan-17/Agent-project-`, production branch `main`). Every push to `main` builds and
   deploys automatically — no manual `vercel deploy` needed. Check progress with
