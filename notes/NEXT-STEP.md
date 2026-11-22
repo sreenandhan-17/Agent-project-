@@ -1,31 +1,23 @@
-# Next step: Build step 5, agent UI
+# Next step: Build step 6, deploy to Vercel + Neon
 
-Source of truth: PROJECT_SUMMARY.md §8. This step also closes **notes 11 and 16**, and should settle **15** (and **10** if decided).
+Source of truth: PROJECT_SUMMARY.md §2, §9, §11. This step closes **notes 05 and 06**. Optionally add **14** (rate limit).
 
-## Backend first (the UI needs these)
+## You need (once)
+- A **Neon** account. Create a project in an India or Singapore region and copy the **pooled** connection string.
+- A **Vercel** account. Run `npx vercel login` in the terminal (type `! npx vercel login` here).
 
-- `GET /api/tickets?view=all|mine|unassigned|late|waiting&status=&priority=&q=`: list with customer name, assignee name and an **SLA state** per ticket: `{target: "first_response"|"resolution", due_at, state: "green"|"amber"|"red"|"paused", remaining_minutes}`.
-  - **Late** must exclude paused, resolved and closed tickets (**note 11**).
-  - Amber means less than 25% of the SLA budget is left. Grey "paused" whenever `paused_at` is set.
-- `GET /api/tickets/{id}`: detail with **all** messages (including INTERNAL, marked as such), assignee, customer and SLA state.
-- `GET /api/tickets/{id}/timeline`: audit events with actor names.
-- `GET /api/agents`: names, for displaying assignees.
-- Tests: the SLA state calculation (green/amber/red/paused boundaries), each view filter, and that a waiting ticket is never Late.
-
-## Frontend (`/frontend`)
-
-- **Login page:** store the token in `sessionStorage` (**note 16**). On any 401, clear it and go to `/login`.
-- **Ticket list:** tabs for All, Mine, Unassigned, Late and Waiting; columns for number, subject, customer, priority, status, assignee and **SLA badge** (red/amber/green/grey, with a tooltip showing the due time in IST and the working time remaining); auto-refresh every 30 seconds.
-- **Ticket detail:**
-  - Header with status and priority controls (showing a 422 message on an invalid transition).
-  - **Take ticket** button; on 409, a toast saying "Already taken by X" and a refresh.
-  - **Conversation:** public messages, with internal notes inline as **yellow** cards labelled "Internal note".
-  - **Reply box:** enabled only for the assignee; otherwise it shows "Take the ticket to reply".
-  - **Internal note box:** separate and yellow.
-  - **Timeline tab.**
-- API base URL from `VITE_API_URL`, with a Vite dev proxy to `localhost:8000`.
-- Never render message bodies with `dangerouslySetInnerHTML`.
+## What to build
+1. **`api/index.py`:** add `backend/` to `sys.path`, then `from app.main import app`.
+2. **Root `requirements.txt`:** production dependencies only (no pytest or httpx). Vercel's Python runtime reads it from the root.
+3. **`vercel.json`:**
+   - build the frontend: `cd frontend && npm ci && npm run build`, output `frontend/dist`
+   - rewrite `/api/(.*)` to the Python function
+   - SPA fallback: every other path goes to `/index.html`, so `/tickets/9` works on reload
+   - cron entry for `/api/cron/auto-close` (the endpoint itself comes in step 7)
+4. **⚠️ Neon pooler + psycopg 3:** the pooled URL goes through PgBouncer in transaction mode, which breaks psycopg's automatic prepared statements. In `app/db.py`, pass `connect_args={"prepare_threshold": None}`. Otherwise requests fail randomly with `prepared statement "_pg3_0" does not exist`.
+5. **Vercel environment variables:** `DATABASE_URL` (pooled), `JWT_SECRET` and `CRON_SECRET`, each from `python -c "import secrets; print(secrets.token_urlsafe(48))"`. **Do not set `ENV=dev`** (note 13).
+6. **Database:** run `alembic upgrade head` and `python seed.py` once against Neon from your machine, using the **direct** (non-pooled) URL for migrations.
+7. **Smoke test on the live URL:** `GET /api/health` returns `{"status":"ok","db":true}`; log in as ananya; the list loads; reloading `/tickets/1` works.
 
 ## Prompt to start it
-
-> Read CLAUDE.md, PROJECT_SUMMARY.md (§8) and notes/NEXT-STEP.md. Do build step 5: the list/detail/timeline endpoints with SLA state (fixing note 11), then the React UI (fixing note 16 with sessionStorage). Log any new issues as separate numbered files in notes/. Run pytest and `npm run build`, show the output, and start both servers so I can try it. If all pass, tick item 5, mark notes 11 and 16 resolved, update notes/NEXT-STEP.md for step 6, commit "Step 5: agent UI" and push to main.
+> Read CLAUDE.md, PROJECT_SUMMARY.md and notes/NEXT-STEP.md. Do build step 6: api/index.py, root requirements.txt, vercel.json (frontend build, /api rewrite, SPA fallback), psycopg prepare_threshold for the Neon pooler, then deploy. Ask me for the Neon URL / Vercel login when needed and never print secrets. Smoke-test the live URL and show the results. If it works, tick item 6, mark notes 05 and 06 resolved, update NEXT-STEP.md for step 7, commit "Step 6: deploy to Vercel + Neon" and push.

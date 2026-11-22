@@ -1,6 +1,8 @@
-from datetime import datetime
+from dataclasses import asdict
+from datetime import datetime, timezone
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
@@ -10,6 +12,8 @@ from app.db import get_session
 from app.deps import get_current_agent
 from app.models import (
     Agent,
+    AuditAction,
+    AuditEvent,
     AuthorType,
     CustomerImpact,
     Priority,
@@ -20,7 +24,11 @@ from app.models import (
 from app.serializers.customer import render_transcript, serialize_for_customer
 from app.services.audit import Actor
 from app.services.email import send_customer_email
+from app.sla.policy import load_holidays
+from app.sla.state import sla_state
+from app.services.queries import TicketView, ticket_list_query
 from app.services.tickets import (
+    ALLOWED_TRANSITIONS,
     ClaimOutcome,
     InvalidTransition,
     NotAssignee,
@@ -86,6 +94,62 @@ class MessageOut(BaseModel):
     created_at: datetime
 
 
+class SlaOut(BaseModel):
+    target: Literal["first_response", "resolution"] | None
+    due_at: datetime | None
+    state: Literal["green", "amber", "red", "paused", "done"]
+    remaining_minutes: int | None
+
+
+class TicketListItem(TicketOut):
+    customer_name: str
+    assignee_name: str | None
+    sla: SlaOut
+
+
+class CustomerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    email: str
+    phone: str | None
+    company: str | None
+
+
+class AgentMessageOut(MessageOut):
+    author_name: str
+
+
+class TicketDetail(TicketListItem):
+    customer: CustomerOut
+    public_token: str
+    parent_ticket_number: str | None
+    allowed_statuses: list[TicketStatus]  # transitions THIS agent may make now
+    messages: list[AgentMessageOut]
+
+
+class TimelineEvent(BaseModel):
+    id: int
+    action: AuditAction
+    field: str | None
+    old_value: Any
+    new_value: Any
+    created_at: datetime
+    actor_type: AuthorType
+    actor_id: int | None
+    actor_name: str
+
+
+def _list_item(ticket: Ticket, now: datetime, holidays: set) -> TicketListItem:
+    return TicketListItem(
+        **TicketOut.model_validate(ticket).model_dump(),
+        customer_name=ticket.customer.name,
+        assignee_name=ticket.assignee.name if ticket.assignee else None,
+        sla=SlaOut(**asdict(sla_state(ticket, now, holidays))),
+    )
+
+
 def _get_ticket(session: Session, ticket_id: int, *, lock: bool = False) -> Ticket:
     # Row lock (lock=True) so two concurrent changes to one ticket apply one after the other.
     ticket = session.get(Ticket, ticket_id, with_for_update=lock)
@@ -94,16 +158,91 @@ def _get_ticket(session: Session, ticket_id: int, *, lock: bool = False) -> Tick
     return ticket
 
 
-@router.get("", response_model=list[TicketOut])
+@router.get("", response_model=list[TicketListItem])
 def list_tickets(
+    view: TicketView = "all",
+    status_: TicketStatus | None = Query(default=None, alias="status"),
+    priority: Priority | None = None,
     needs_triage: bool | None = None,
+    q: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=200, ge=1, le=500),
     session: Session = Depends(get_session),
+    agent: Agent = Depends(get_current_agent),
 ):
-    """Agent ticket list, newest first. Views, filters and SLA badges come in step 5."""
-    stmt = select(Ticket).order_by(Ticket.created_at.desc(), Ticket.id.desc())
-    if needs_triage is not None:
-        stmt = stmt.where(Ticket.needs_triage.is_(needs_triage))
-    return session.scalars(stmt).all()
+    """Agent ticket list: active tickets first, most urgent deadline first.
+
+    Views: all | mine | unassigned | late | waiting | triage. "late" never includes tickets
+    that are waiting on the customer, resolved or closed (notes/11).
+    """
+    now = datetime.now(timezone.utc)
+    stmt = ticket_list_query(
+        view, agent_id=agent.id, now=now, status=status_, priority=priority,
+        needs_triage=needs_triage, q=q,
+    ).limit(limit)
+    holidays = load_holidays(session)
+    return [_list_item(t, now, holidays) for t in session.scalars(stmt)]
+
+
+@router.get("/{ticket_id}", response_model=TicketDetail)
+def get_ticket(
+    ticket_id: int,
+    session: Session = Depends(get_session),
+    agent: Agent = Depends(get_current_agent),
+):
+    """Agent ticket detail. Includes INTERNAL notes: agent-only, never for customers."""
+    ticket = _get_ticket(session, ticket_id)
+    now = datetime.now(timezone.utc)
+    holidays = load_holidays(session)
+    agents = {a.id: a.name for a in session.scalars(select(Agent))}
+    parent = session.get(Ticket, ticket.parent_ticket_id) if ticket.parent_ticket_id else None
+    item = _list_item(ticket, now, holidays)
+    return TicketDetail(
+        **item.model_dump(),
+        customer=CustomerOut.model_validate(ticket.customer),
+        public_token=ticket.public_token,
+        parent_ticket_number=parent.number if parent else None,
+        allowed_statuses=sorted(
+            (s for s in ALLOWED_TRANSITIONS[ticket.status] if may_change_status(ticket, agent, s)),
+            key=lambda s: s.value,
+        ),
+        messages=[
+            AgentMessageOut(
+                **MessageOut.model_validate(m).model_dump(),
+                author_name=(
+                    ticket.customer.name
+                    if m.author_type is AuthorType.CUSTOMER
+                    else agents.get(m.author_agent_id, "System")
+                ),
+            )
+            for m in sorted(ticket.messages, key=lambda m: m.id)
+        ],
+    )
+
+
+@router.get("/{ticket_id}/timeline", response_model=list[TimelineEvent])
+def get_timeline(ticket_id: int, session: Session = Depends(get_session)):
+    """Audit trail for one ticket, oldest first (INC-0318)."""
+    ticket = _get_ticket(session, ticket_id)
+    events = session.scalars(
+        select(AuditEvent).where(AuditEvent.ticket_id == ticket.id).order_by(AuditEvent.id)
+    ).all()
+    agents = {a.id: a.name for a in session.scalars(select(Agent))}
+
+    def actor_name(e: AuditEvent) -> str:
+        if e.actor_type is AuthorType.SYSTEM:
+            return "System"
+        if e.actor_type is AuthorType.CUSTOMER:
+            return ticket.customer.name if e.actor_id == ticket.customer_id else "Customer"
+        return agents.get(e.actor_id, f"Agent #{e.actor_id}")
+
+    return [
+        TimelineEvent(
+            id=e.id, action=e.action, field=e.field, old_value=e.old_value,
+            new_value=e.new_value, created_at=e.created_at, actor_type=e.actor_type,
+            actor_id=e.actor_id, actor_name=actor_name(e),
+        )
+        for e in events
+    ]
 
 
 @router.patch("/{ticket_id}/status", response_model=TicketOut)
@@ -139,7 +278,7 @@ def update_priority(
     session: Session = Depends(get_session),
     agent: Agent = Depends(get_current_agent),
 ):
-    # Any active agent may re-prioritise (triage); audited with old/new deadlines (Â§4).
+    # Any active agent may re-prioritise (triage); audited with old/new deadlines (Ã‚Â§4).
     ticket = _get_ticket(session, ticket_id, lock=True)
     change_priority(session, ticket, body.priority, Actor.agent(agent.id))
     session.commit()

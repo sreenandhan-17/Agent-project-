@@ -1,5 +1,7 @@
 # 11: While a ticket is paused, its stored deadlines don't include the current pause
 
+> **✅ RESOLVED in step 5.** `app/sla/state.py: sla_state()` returns `paused` (grey) whenever `paused_at` is set or the status is WAITING_ON_CUSTOMER, whatever the stored deadline says. RESOLVED and CLOSED return `done`. The Late view (`app/services/queries.py: late_condition`) only counts NEW, OPEN and REOPENED tickets that aren't paused and whose tracked deadline has passed. Tests: `test_waiting_is_paused_even_when_stored_deadline_passed`, `test_waiting_ticket_is_never_late`, and `test_late_view_matches_red_badges` (Late view and red badges always agree).
+
 **Found in:** step 3
 **Severity:** 🟡 Affects the "Late" filter and SLA badges
 **Fixed in:** step 5 (UI and list filters)

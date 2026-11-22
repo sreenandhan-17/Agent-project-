@@ -1,5 +1,7 @@
 # 16: Where the frontend keeps the JWT
 
+> **✅ RESOLVED in step 5.** Option chosen: `sessionStorage` (`frontend/src/api.ts`, keys `frontdesk.token` and `frontdesk.agent`, every access wrapped in try/catch). Any 401 clears the session and redirects to `/login?expired=1`. Message bodies are rendered as React text (`whitespace-pre-wrap`); `dangerouslySetInnerHTML` is never used. Log out clears the session in the browser only; the server still checks `is_active` on every request.
+
 **Found in:** step 4
 **Severity:** 🟡 Design decision for step 5
 **Fixed in:** step 5 (UI)

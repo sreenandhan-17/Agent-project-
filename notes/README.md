@@ -2,7 +2,7 @@
 
 One file per issue, numbered in the order found. Resolved issues stay listed with ✅.
 
-**Status after step 4 + notes 10, 13, 15:** 177 tests passing, no errors.
+**Status after step 5:** 215 backend tests passing, frontend builds, no errors.
 
 | # | Issue | Found | Severity | Status / fixed in |
 |---|---|---|---|---|
@@ -16,12 +16,14 @@ One file per issue, numbered in the order found. Resolved issues stay listed wit
 | 08 | ~~[Endpoints trust an `X-Agent-Id` header](08-temporary-agent-header-auth.md)~~ | Step 3 | 🔴 Security | ✅ Resolved (step 4) |
 | 09 | [7-day reopen window not enforced](09-reopen-window-not-enforced.md) | Step 3 | 🟠 Rule gap | Step 7 |
 | 10 | ~~[Any agent can change any ticket's status/priority](10-who-may-change-status.md)~~ | Step 3 | 🟡 Decision needed | ✅ Resolved (option 2) |
-| 11 | [Stored deadlines ignore the current pause](11-stored-deadlines-during-pause.md) | Step 3 | 🟡 Late filter | Step 5 |
+| 11 | ~~[Stored deadlines ignore the current pause](11-stored-deadlines-during-pause.md)~~ | Step 3 | 🟡 Late filter | ✅ Resolved (step 5) |
 | 12 | ~~[`first_response_at` is never set](12-first-response-at-never-set.md)~~ | Step 3 | 🟠 Rule gap | ✅ Resolved (step 4) |
 | 13 | ~~[`JWT_SECRET` falls back to a hard-coded default](13-jwt-secret-default.md)~~ | Step 4 | 🔴 Security | ✅ Resolved |
 | 14 | [Public submission has no rate limit](14-public-endpoint-abuse.md) | Step 4 | 🟠 Abuse risk | Step 6 / note |
 | 15 | ~~[Customer tickets default to MEDIUM](15-customer-ticket-default-priority.md)~~ | Step 4 | 🟡 Decision needed | ✅ Resolved (option 1 + impact hint) |
-| 16 | [Where the frontend keeps the JWT](16-frontend-token-storage.md) | Step 4 | 🟡 Design | Step 5 |
+| 16 | ~~[Where the frontend keeps the JWT](16-frontend-token-storage.md)~~ | Step 4 | 🟡 Design | ✅ Resolved (step 5, sessionStorage) |
 | 17 | [Replies accepted on RESOLVED/CLOSED tickets](17-messages-on-closed-tickets.md) | Step 4 | 🟡 Rule gap | Step 7 |
+| 18 | [No customer-facing web pages; email link points nowhere](18-no-customer-web-pages.md) | Step 5 | 🟠 Demo gap | Step 7 / note |
+| 19 | [Ticket list capped at 200 rows, no pagination](19-ticket-list-capped-at-200.md) | Step 5 | 🟡 Truncation | Later / note |
 
-**Next:** [NEXT-STEP.md](NEXT-STEP.md): build step 5, the agent UI.
+**Next:** [NEXT-STEP.md](NEXT-STEP.md): build step 6, deploy to Vercel + Neon.

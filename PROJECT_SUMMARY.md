@@ -215,7 +215,7 @@ All routes are under `/api`. Agent routes require a JWT. Public routes use the t
 **Login page.**
 
 **Ticket list**
-- Filter tabs: **Mine**, **Unassigned**, **Late**, **Waiting on customer** (plus All).
+- Filter tabs: **Mine**, **Unassigned**, **Late**, **Waiting on customer**, **Needs triage** (plus All). Search by number, subject or customer. Auto-refresh every 30 seconds.
 - Columns: number, subject, customer, priority, status, assignee, and **SLA badge**.
 - SLA badge (for the next pending deadline: first reply if none has been sent yet, otherwise resolution):
   - **Red:** breached
@@ -275,7 +275,7 @@ vercel.json        rewrites + cron schedule
 - [x] 2. Working-hours calculator + tests
 - [x] 3. Status transitions, SLA pause/resume, priority recompute
 - [x] 4. Atomic claim (409) + PUBLIC/INTERNAL separation + leak test
-- [ ] 5. Agent UI (list, filters, SLA badges, detail, timeline, reply/note boxes)
+- [x] 5. Agent UI (list, filters, SLA badges, detail, timeline, reply/note boxes)
 - [ ] 6. Deploy to Vercel + Neon, live URL working
 - [ ] 7. Auto-close cron + reopen window + follow-up tickets
 - [ ] 8. README + "what I didn't finish" note
