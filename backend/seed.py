@@ -26,6 +26,7 @@ from app.models import (
     Visibility,
 )
 from app.services.audit import record_event
+from app.sla.policy import compute_deadlines, load_holidays
 
 DEMO_PASSWORD = "frontdesk-demo"
 
@@ -124,6 +125,7 @@ def seed_holidays(session: Session) -> int:
 def seed_tickets(session: Session, agents: list[Agent], customers: list[Customer]) -> int:
     existing = set(session.execute(select(Ticket.subject, Ticket.customer_id)).tuples())
     now = datetime.now(timezone.utc)
+    hols = load_holidays(session)
     added = 0
     for subject, c_idx, priority, status, a_idx, hours_ago in TICKETS:
         customer = customers[c_idx]
@@ -140,7 +142,6 @@ def seed_tickets(session: Session, agents: list[Agent], customers: list[Customer
             created_at=created,
             last_customer_reply_at=created,
         )
-        # SLA due dates stay NULL until the working-hours calculator exists (build steps 2-3).
         if status is TicketStatus.WAITING_ON_CUSTOMER:
             ticket.paused_at = created + timedelta(hours=1)
         if status in (TicketStatus.RESOLVED, TicketStatus.CLOSED, TicketStatus.REOPENED):
@@ -149,6 +150,7 @@ def seed_tickets(session: Session, agents: list[Agent], customers: list[Customer
             ticket.closed_at = now - timedelta(hours=1)
         if status is TicketStatus.REOPENED:
             ticket.reopen_count = 1
+        ticket.first_response_due_at, ticket.resolution_due_at = compute_deadlines(ticket, hols)
         session.add(ticket)
         session.flush()
 

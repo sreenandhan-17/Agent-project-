@@ -1,5 +1,7 @@
 # 01: SLA due dates are NULL on seeded tickets
 
+> **✅ RESOLVED in step 2.** `seed.py` now calls `compute_deadlines()` on every ticket it creates, and `python -m scripts.backfill_deadlines` filled the 10 existing rows. Verified: `SELECT count(*) FROM tickets WHERE resolution_due_at IS NULL` returns 0.
+
 **What:** `first_response_due_at` and `resolution_due_at` are empty for all 10 seeded tickets.
 
 **Why:** Due dates must come from the working-hours calculator (CLAUDE.md rule 3), which doesn't exist yet.

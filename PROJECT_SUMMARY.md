@@ -256,7 +256,7 @@ vercel.json        rewrites + cron schedule
 ## 12. Progress checklist
 
 - [x] 1. Schema + audit (models, migration, append-only trigger, seed)
-- [ ] 2. Working-hours calculator + tests
+- [x] 2. Working-hours calculator + tests
 - [ ] 3. Status transitions, SLA pause/resume, priority recompute
 - [ ] 4. Atomic claim (409) + PUBLIC/INTERNAL separation + leak test
 - [ ] 5. Agent UI (list, filters, SLA badges, detail, timeline, reply/note boxes)

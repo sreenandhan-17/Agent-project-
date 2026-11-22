@@ -4,7 +4,7 @@ Status after step 1: **no failing tests or errors.** These are known gaps to clo
 
 | # | Issue | Severity | Fixed in |
 |---|---|---|---|
-| 01 | [SLA due dates are NULL on seeded tickets](01-sla-due-dates-null.md) | Expected gap | Steps 2–3 |
+| 01 | ~~[SLA due dates are NULL on seeded tickets](01-sla-due-dates-null.md)~~ | ✅ Resolved | Step 2 |
 | 02 | [Festival holiday dates need verification](02-verify-holiday-dates.md) | Data accuracy | Before step 2 tests |
 | 03 | [Deprecation warning in pytest output](03-pytest-deprecation-warning.md) | Cosmetic | Any time |
 | 04 | [Line-ending (CRLF) warnings on commit](04-line-endings.md) | Cosmetic | Any time |
