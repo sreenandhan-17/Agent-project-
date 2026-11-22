@@ -1,6 +1,6 @@
 # Frontdesk
 
-A support ticket system for Arvo Systems: 9 agents, ~40 tickets a day, replacing a spreadsheet and WhatsApp with SLA tracking, an audit trail, and a customer portal. The full plan is in [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md); open issues are tracked in [notes/](notes/README.md).
+A support ticket system for Arvo Systems: 9 agents, ~40 tickets a day, replacing a spreadsheet and WhatsApp with SLA tracking, an audit trail, and a customer portal. The full plan is in [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md); open issues are tracked in [notes/](notes/README.md); a short summary of what's finished and what isn't is in [COMPLETION_NOTE.md](COMPLETION_NOTE.md).
 
 ## Live demo
 
