@@ -70,7 +70,7 @@ This builds the frontend (`cd frontend && npm ci && npm run build`) and uploads
 | Check | How |
 |---|---|
 | Health | `curl https://<url>/api/health` → `{"status":"ok","db":true}` |
-| Agent login | Log in at `/login` as `ananya@arvo.example` / `frontdesk-demo` |
+| Agent login | Log in at `/login` as `ananya@arvo.example` / `frontdesk-agent` |
 | Ticket list | Loads with SLA badges |
 | Claim a ticket | "Take ticket" succeeds, assignee updates |
 | Reply | Assignee sends a public reply |

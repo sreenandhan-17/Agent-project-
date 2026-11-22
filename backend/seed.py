@@ -2,7 +2,7 @@
 
 Usage (from /backend):  python seed.py
 
-Every demo agent logs in with password:  frontdesk-demo
+Every demo agent logs in with password:  frontdesk-agent
 """
 
 from datetime import date, datetime, timedelta, timezone
@@ -29,7 +29,7 @@ from app.models import (
 from app.services.audit import record_event
 from app.sla.policy import compute_deadlines, load_holidays
 
-DEMO_PASSWORD = "frontdesk-demo"
+DEMO_PASSWORD = "frontdesk-agent"
 
 AGENTS = [
     ("Ananya Rao", "ananya@arvo.example", AgentRole.ADMIN),
@@ -96,15 +96,21 @@ TICKETS = [
 
 
 def seed_agents(session: Session) -> list[Agent]:
+    """Create missing demo agents, and reset every agent's password to DEMO_PASSWORD.
+
+    Re-running this after changing DEMO_PASSWORD syncs existing agents too, not just new
+    ones — this is a shared demo roster, so "forgot the password" means "re-run the seed".
+    """
     existing = {a.email: a for a in session.scalars(select(Agent))}
-    pw_hash = None
+    pw_hash = hash_password(DEMO_PASSWORD)
     agents = []
     for name, email, role in AGENTS:
         agent = existing.get(email)
         if agent is None:
-            pw_hash = pw_hash or hash_password(DEMO_PASSWORD)
             agent = Agent(name=name, email=email, role=role, password_hash=pw_hash)
             session.add(agent)
+        else:
+            agent.password_hash = pw_hash
         agents.append(agent)
     session.flush()
     return agents

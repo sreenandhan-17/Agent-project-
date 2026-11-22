@@ -17,6 +17,6 @@
 - prerequisites (Python 3.12, Node, Docker or Neon)
 - `.env` setup, `alembic upgrade head`, `python seed.py`, `uvicorn app.main:app`, and `npm run dev`
 - `pytest`
-- demo logins (password `frontdesk-demo`)
+- demo logins (password `frontdesk-agent`)
 - the business-rule assumptions from PROJECT_SUMMARY.md §3
 - the "what I didn't finish" note

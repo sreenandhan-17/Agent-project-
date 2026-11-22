@@ -81,7 +81,7 @@ export default function Login() {
           {busy ? 'Logging in…' : 'Log in'}
         </button>
         <p className="text-xs text-slate-400">
-          Demo: ananya@arvo.example (admin) or rahul@arvo.example · password frontdesk-demo
+          Demo: ananya@arvo.example (admin) or rahul@arvo.example · password frontdesk-agent
         </p>
         <p className="border-t border-slate-100 pt-3 text-sm text-slate-600">
           Not an agent?{' '}

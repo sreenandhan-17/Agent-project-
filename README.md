@@ -8,8 +8,8 @@ A support ticket system for Arvo Systems: 9 agents, ~40 tickets a day, replacing
 
 | Role | How to get in |
 |---|---|
-| Admin agent | `ananya@arvo.example` / `frontdesk-demo` |
-| Agent | any of `rahul`, `priya`, `vikram`, `meera`, `arjun`, `sneha`, `karthik`, `divya` `@arvo.example` / `frontdesk-demo` |
+| Admin agent | `ananya@arvo.example` / `frontdesk-agent` |
+| Agent | any of `rahul`, `priya`, `vikram`, `meera`, `arjun`, `sneha`, `karthik`, `divya` `@arvo.example` / `frontdesk-agent` |
 | Customer | no login — open [`/new`](https://frontdesk-mu-neon.vercel.app/new) |
 
 (All nine agents and their passwords come straight from `backend/seed.py`.)
@@ -126,7 +126,7 @@ npm run dev                                         # http://localhost:5173
 ./venv/Scripts/pytest
 ```
 
-Log in at `http://localhost:5173/login` with any seeded agent and password `frontdesk-demo`; the customer portal is at `http://localhost:5173/new`.
+Log in at `http://localhost:5173/login` with any seeded agent and password `frontdesk-agent`; the customer portal is at `http://localhost:5173/new`.
 
 ⚠️ **`TEST_DATABASE_URL`, if set, is wiped and rebuilt from scratch on every pytest run.** Point it at a disposable database, never at `DATABASE_URL` or anything with real data. Leaving it unset is fine — tests then run against `DATABASE_URL` inside a transaction that's always rolled back.
 
