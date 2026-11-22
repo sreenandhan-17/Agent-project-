@@ -278,7 +278,8 @@ def update_priority(
     session: Session = Depends(get_session),
     agent: Agent = Depends(get_current_agent),
 ):
-    # Any active agent may re-prioritise (triage); audited with old/new deadlines (Ã‚Â§4).
+    # Any active agent may set priority; this is the triage decision and always clears
+    # needs_triage. Audited with old/new priority, flag and deadlines (§3.1, §4).
     ticket = _get_ticket(session, ticket_id, lock=True)
     change_priority(session, ticket, body.priority, Actor.agent(agent.id))
     session.commit()

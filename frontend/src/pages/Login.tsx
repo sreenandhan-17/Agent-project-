@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 
 import { ApiError, api, saveSession } from '../api'
 
@@ -66,6 +66,12 @@ export default function Login() {
         </button>
         <p className="text-xs text-slate-400">
           Demo: ananya@arvo.example (admin) or rahul@arvo.example · password frontdesk-demo
+        </p>
+        <p className="border-t border-slate-100 pt-3 text-sm text-slate-600">
+          Not an agent?{' '}
+          <Link to="/new" className="font-medium text-sky-700 hover:underline">
+            Customer portal: contact support →
+          </Link>
         </p>
       </form>
     </main>

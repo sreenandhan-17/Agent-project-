@@ -4,7 +4,10 @@ Every response here MUST be a CustomerTicketView from serialize_for_customer().
 tests/test_no_leaks.py fails if a route is added here without being leak-tested.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,6 +18,7 @@ from app.serializers.customer import CustomerTicketView, serialize_for_customer
 from app.services.tickets import add_customer_reply, create_customer_ticket
 
 router = APIRouter(prefix="/api/public", tags=["public"])
+log = logging.getLogger("frontdesk.public")
 
 
 class NewTicketIn(BaseModel):
@@ -25,6 +29,8 @@ class NewTicketIn(BaseModel):
     subject: str = Field(min_length=1, max_length=200)
     body: str = Field(min_length=1, max_length=10_000)
     impact: CustomerImpact  # "I can't work" / "partly affected" / "just a question"
+    # Honeypot (notes/14): hidden from people by the form; bots that fill every field fill it.
+    website: str | None = Field(default=None, max_length=500)
 
 
 class CustomerReplyIn(BaseModel):
@@ -48,6 +54,10 @@ def _ticket_by_token(session: Session, token: str, *, lock: bool = False) -> Tic
 
 @router.post("/tickets", response_model=NewTicketOut, status_code=201)
 def submit_ticket(body: NewTicketIn, session: Session = Depends(get_session)):
+    if body.website and body.website.strip():
+        # Looks like success to the bot; nothing is stored and no customer data is echoed.
+        log.info("public ticket dropped: honeypot field filled")
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"status": "received"})
     ticket = create_customer_ticket(
         session,
         name=body.name,

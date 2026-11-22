@@ -2,7 +2,9 @@ import type { ReactNode } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate } from 'react-router'
 
 import { clearSession, getSession } from './api'
+import CustomerTicket from './pages/CustomerTicket'
 import Login from './pages/Login'
+import NewTicket from './pages/NewTicket'
 import TicketDetail from './pages/TicketDetail'
 import TicketList from './pages/TicketList'
 
@@ -49,6 +51,10 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {/* Customer portal (notes/18): public, never behind the agent login. */}
+        <Route path="/new" element={<NewTicket />} />
+        <Route path="/t/:token" element={<CustomerTicket />} />
+        <Route path="/t/*" element={<CustomerTicket />} />
         <Route
           path="/"
           element={
@@ -69,6 +75,7 @@ export default function App() {
             </RequireLogin>
           }
         />
+        {/* Unknown agent URLs go to the list (and so to login if needed). /new and /t/* never get here. */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

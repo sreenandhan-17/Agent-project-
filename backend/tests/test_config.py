@@ -14,7 +14,10 @@ def load(monkeypatch):
     """Build Settings from exactly the given env vars: no .env file, no inherited values."""
 
     def _load(**env: str) -> Settings:
-        for var in ("ENV", "DATABASE_URL", "TEST_DATABASE_URL", "JWT_SECRET", "CRON_SECRET"):
+        for var in (
+            "ENV", "DATABASE_URL", "TEST_DATABASE_URL", "JWT_SECRET", "CRON_SECRET",
+            "PUBLIC_BASE_URL", "VERCEL_PROJECT_PRODUCTION_URL",
+        ):
             monkeypatch.delenv(var, raising=False)
         for var, value in env.items():
             monkeypatch.setenv(var, value)
@@ -63,7 +66,10 @@ def test_short_secret_rejected_even_in_dev(load, env):
 
 
 def test_production_with_strong_secrets_loads(load):
-    s = load(ENV="production", DATABASE_URL=DB, JWT_SECRET=STRONG, CRON_SECRET=STRONG + "c")
+    s = load(
+        ENV="production", DATABASE_URL=DB, JWT_SECRET=STRONG, CRON_SECRET=STRONG + "c",
+        PUBLIC_BASE_URL="https://support.arvo.example",
+    )
     assert not s.is_dev
     assert (s.jwt_secret, s.cron_secret) == (STRONG, STRONG + "c")
 
@@ -79,3 +85,38 @@ def test_dev_falls_back_to_long_dev_secrets(load, env):
 
 def test_dev_uses_provided_secret_over_default(load):
     assert load(ENV="dev", DATABASE_URL=DB, JWT_SECRET=STRONG).jwt_secret == STRONG
+
+
+# --- PUBLIC_BASE_URL (notes/18) ----------------------------------------------------------
+
+PROD = {"ENV": "production", "DATABASE_URL": DB, "JWT_SECRET": STRONG, "CRON_SECRET": STRONG}
+
+
+def test_public_base_url_required_in_production(load):
+    with pytest.raises(ValidationError, match="PUBLIC_BASE_URL is not set"):
+        load(**PROD)
+
+
+def test_public_base_url_explicit_and_trailing_slash_stripped(load):
+    s = load(**PROD, PUBLIC_BASE_URL="https://support.arvo.example/")
+    assert s.public_base_url == "https://support.arvo.example"
+
+
+def test_public_base_url_falls_back_to_vercel_production_domain(load):
+    s = load(**PROD, VERCEL_PROJECT_PRODUCTION_URL="frontdesk-arvo.vercel.app")
+    assert s.public_base_url == "https://frontdesk-arvo.vercel.app"
+
+
+def test_explicit_public_base_url_beats_vercel_domain(load):
+    s = load(**PROD, PUBLIC_BASE_URL="https://support.arvo.example",
+             VERCEL_PROJECT_PRODUCTION_URL="frontdesk-arvo.vercel.app")
+    assert s.public_base_url == "https://support.arvo.example"
+
+
+def test_public_base_url_dev_default_is_vite(load):
+    assert load(ENV="dev", DATABASE_URL=DB).public_base_url == "http://localhost:5173"
+
+
+def test_public_base_url_must_be_http(load):
+    with pytest.raises(ValidationError, match="must start with https://"):
+        load(**PROD, PUBLIC_BASE_URL="support.arvo.example")

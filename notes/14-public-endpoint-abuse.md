@@ -1,5 +1,7 @@
 # 14: Public ticket submission has no rate limit or spam protection
 
+> **🟡 PARTLY DONE (note 18).** Honeypot added: the public form has a hidden `website` field. If it's filled, `POST /api/public/tickets` returns `200 {"status":"received"}` and stores nothing. Tested in `tests/test_customer_portal.py`. **Still open:** a per-IP rate limit, and protection for `/replies`.
+
 **Found in:** step 4
 **Severity:** 🟠 Abuse risk once the site is live
 **Fixed in:** step 6, or record it in the "what I didn't finish" note (step 8)

@@ -1,4 +1,4 @@
-"""Database models. See PROJECT_SUMMARY.md Â§6."""
+"""Database models. See PROJECT_SUMMARY.md §6."""
 
 import enum
 import secrets

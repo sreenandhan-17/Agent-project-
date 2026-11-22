@@ -21,6 +21,12 @@ Business-rule choices that PROJECT_SUMMARY.md left open, and how they were settl
 - The form asks for **impact** (*I can't work* / *partly affected* / *just a question*). This is a hint for agents only and never changes priority automatically.
 - Any agent's priority change is the triage decision and clears the flag. Confirming the current priority is logged as `TRIAGED`; a new priority is logged as `PRIORITY_CHANGED`, with deadlines recomputed and possibly breached immediately.
 
+### Customer portal
+- Customers use **`/new`** to contact support and **`/t/{token}`** to follow and reply. The token is an unguessable private link; the portal has no customer accounts or passwords.
+- The portal only ever shows the server's customer view: public messages, the support team name instead of agent names, and status in customer wording.
+- **Spam:** a hidden honeypot field silently drops bot submissions. There's no rate limit yet (notes/14).
+- Email links are absolute: `{PUBLIC_BASE_URL}/t/{token}`.
+
 ### SLA
 - Working time is 09:30–18:30 Asia/Kolkata, Mon–Fri, excluding the 2026 Central Government gazetted holidays (DoPT list).
 - **URGENT "same working day":** resolve by 18:30 IST of the day the ticket starts counting, but never before the first-reply deadline (for example, a ticket created at 17:45 is due the next morning).

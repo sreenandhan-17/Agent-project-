@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 MIN_SECRET_LENGTH = 32
+DEV_PUBLIC_BASE_URL = "http://localhost:5173"  # Vite dev server
 
 # Used ONLY when ENV=dev and the variable is unset. Public on purpose: never valid in production.
 _DEV_SECRETS = {
@@ -36,6 +37,11 @@ class Settings(BaseSettings):
     # No defaults: required unless ENV=dev (notes/13).
     jwt_secret: str | None = None
     cron_secret: str | None = None
+    # Where customers open their ticket (/t/{token}) from emails (notes/18). Resolved in
+    # _require_public_base_url: PUBLIC_BASE_URL, else Vercel's production domain, else the
+    # Vite dev server when ENV=dev.
+    public_base_url: str | None = None
+    vercel_project_production_url: str | None = None  # set by Vercel, hostname only
 
     @field_validator("database_url", "test_database_url")
     @classmethod
@@ -68,6 +74,23 @@ class Settings(BaseSettings):
                 "Invalid configuration: " + "; ".join(problems) + ". Generate a secret with: "
                 "python -c \"import secrets; print(secrets.token_urlsafe(48))\""
             )
+        return self
+
+    @model_validator(mode="after")
+    def _require_public_base_url(self) -> "Settings":
+        url = self.public_base_url
+        if not url and self.vercel_project_production_url:
+            url = f"https://{self.vercel_project_production_url}"
+        if not url and self.is_dev:
+            url = DEV_PUBLIC_BASE_URL
+        if not url:
+            raise ValueError(
+                "Invalid configuration: PUBLIC_BASE_URL is not set (e.g. https://frontdesk.example"
+                ".com; required unless ENV=dev or running on Vercel)"
+            )
+        if not url.startswith(("https://", "http://")):
+            raise ValueError("Invalid configuration: PUBLIC_BASE_URL must start with https://")
+        self.public_base_url = url.rstrip("/")
         return self
 
 

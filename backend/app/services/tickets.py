@@ -1,4 +1,4 @@
-"""Ticket state changes. See PROJECT_SUMMARY.md Â§3.3, Â§3.6, Â§4, Â§5.
+"""Ticket state changes. See PROJECT_SUMMARY.md §3.3, §3.6, §4, §5.
 
 Every status change goes through transition() (except the atomic claim, which sets NEW -> OPEN
 in its own UPDATE); every priority change through change_priority(). All functions write their
@@ -50,7 +50,7 @@ class InvalidTransition(Exception):
 
 
 def may_change_status(ticket: Ticket, agent: Agent, to_status: TicketStatus) -> bool:
-    """Agent permission for PATCH /status (Â§4, notes/10).
+    """Agent permission for PATCH /status (§4, notes/10).
 
     Assignee or ADMIN; plus any agent may close a NEW unassigned ticket (spam/duplicate).
     """
@@ -77,7 +77,7 @@ def _now(now: datetime | None) -> datetime:
 def _resume_sla(
     session: Session, ticket: Ticket, actor: Actor, now: datetime, holidays: set[date]
 ) -> None:
-    """Close the current pause: add its working minutes and shift deadlines by them (Â§3.3)."""
+    """Close the current pause: add its working minutes and shift deadlines by them (§3.3)."""
     paused = working_minutes_between(ticket.paused_at, now, holidays)
     old = {"paused_minutes": ticket.paused_minutes, **_deadlines(ticket)}
     ticket.paused_minutes = (ticket.paused_minutes or 0) + paused
@@ -136,9 +136,9 @@ def change_priority(
     *,
     holidays: set[date] | None = None,
 ) -> bool:
-    """Set priority; this is also the triage decision, so it always clears needs_triage (Â§3.1).
+    """Set priority; this is also the triage decision, so it always clears needs_triage (§3.1).
 
-    A new priority recomputes deadlines from created_at (Â§3.6) and may breach the ticket
+    A new priority recomputes deadlines from created_at (§3.6) and may breach the ticket
     immediately: audited as PRIORITY_CHANGED. Confirming the current priority on a ticket
     that needs triage only clears the flag: audited as TRIAGED. Otherwise a no-op (False).
     """
@@ -237,7 +237,7 @@ class NotAssignee(Exception):
 def add_reply(
     session: Session, ticket: Ticket, agent: Agent, body: str, *, now: datetime | None = None
 ) -> Message:
-    """PUBLIC reply. Assignee only (INC-0291). The first one sets first_response_at (Â§3.1)."""
+    """PUBLIC reply. Assignee only (INC-0291). The first one sets first_response_at (§3.1)."""
     if ticket.assignee_id != agent.id:
         raise NotAssignee()
     now = _now(now)
@@ -354,7 +354,7 @@ def create_customer_ticket(
 def add_customer_reply(
     session: Session, ticket: Ticket, body: str, *, now: datetime | None = None
 ) -> Message:
-    """Customer reply. Resumes the SLA clock if the ticket was waiting on the customer (Â§3.3).
+    """Customer reply. Resumes the SLA clock if the ticket was waiting on the customer (§3.3).
 
     Reopening resolved/closed tickets (7-day window) is build step 7 (notes/09).
     """
