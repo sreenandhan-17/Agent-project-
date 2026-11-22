@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Agent,
+    AgentRole,
     AuditAction,
     AuthorType,
     Customer,
@@ -45,6 +46,16 @@ class InvalidTransition(Exception):
         self.to_status = to_status
         self.allowed = sorted(s.value for s in ALLOWED_TRANSITIONS[from_status])
         super().__init__(f"cannot move ticket from {from_status.value} to {to_status.value}")
+
+
+def may_change_status(ticket: Ticket, agent: Agent, to_status: TicketStatus) -> bool:
+    """Agent permission for PATCH /status (§4, notes/10).
+
+    Assignee or ADMIN; plus any agent may close a NEW unassigned ticket (spam/duplicate).
+    """
+    if agent.role is AgentRole.ADMIN or ticket.assignee_id == agent.id:
+        return True
+    return ticket.status is S.NEW and ticket.assignee_id is None and to_status is S.CLOSED
 
 
 def _iso(dt: datetime | None) -> str | None:

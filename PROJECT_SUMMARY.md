@@ -95,6 +95,10 @@ RETURNING id;
 - 1 row: claimed (200), plus a `CLAIMED` audit event in the same transaction.
 - 0 rows: re-read the ticket. If it is already mine, return 200 (idempotent). Otherwise return **HTTP 409 Conflict** with the current assignee's name.
 - **Only the assignee can send a public reply** (otherwise 403). Any agent can add an internal note.
+- **Who may change what** (decision, notes/10):
+  - **Status** (`PATCH /status`): only the **assignee** or an **ADMIN**, otherwise 403. One exception: **any agent may close a NEW, unassigned ticket** (spam or duplicate) without claiming it.
+  - **Priority** (`PATCH /priority`): **any active agent**, so leads can triage unassigned tickets. Every change is audited with the old and new deadlines.
+  - The permission check runs before transition validation: a non-assignee gets 403, not 422.
 - Test: two concurrent sessions claim the same ticket; exactly one gets 200 and the other gets 409.
 
 ### INC-0304 — An internal note leaked to a customer
@@ -137,6 +141,8 @@ RETURNING id;
 | REOPENED | WAITING_ON_CUSTOMER, RESOLVED | Same as OPEN |
 
 Any other transition returns **HTTP 422**. All transitions go through one function, `transition(ticket, to_status, actor)`, which validates the transition, applies pause and resume, and writes the audit event.
+
+**Who may trigger an agent transition:** the ticket's **assignee** or an **ADMIN** (403 otherwise). The exception is **NEW (unassigned) → CLOSED**, which any agent may do for spam or duplicates. NEW → OPEN happens through the claim, not `PATCH /status`. System (auto-close) and customer (reply) transitions are not agent requests and are not subject to this rule. See §4.
 
 ## 6. Data model (key columns)
 

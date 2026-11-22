@@ -2,7 +2,7 @@
 
 One file per issue, numbered in the order found. Resolved issues stay listed with ✅.
 
-**Status after step 4:** 137 tests passing, no errors.
+**Status after step 4 + note 10:** 149 tests passing, no errors.
 
 | # | Issue | Found | Severity | Status / fixed in |
 |---|---|---|---|---|
@@ -15,7 +15,7 @@ One file per issue, numbered in the order found. Resolved issues stay listed wit
 | 07 | [No README / local setup docs](07-readme-missing.md) | Step 1 | Deliverable | Step 8 |
 | 08 | ~~[Endpoints trust an `X-Agent-Id` header](08-temporary-agent-header-auth.md)~~ | Step 3 | 🔴 Security | ✅ Resolved (step 4) |
 | 09 | [7-day reopen window not enforced](09-reopen-window-not-enforced.md) | Step 3 | 🟠 Rule gap | Step 7 |
-| 10 | [Any agent can change any ticket's status/priority](10-who-may-change-status.md) | Step 3 | 🟡 Decision needed | Open |
+| 10 | ~~[Any agent can change any ticket's status/priority](10-who-may-change-status.md)~~ | Step 3 | 🟡 Decision needed | ✅ Resolved (option 2) |
 | 11 | [Stored deadlines ignore the current pause](11-stored-deadlines-during-pause.md) | Step 3 | 🟡 Late filter | Step 5 |
 | 12 | ~~[`first_response_at` is never set](12-first-response-at-never-set.md)~~ | Step 3 | 🟠 Rule gap | ✅ Resolved (step 4) |
 | 13 | [`JWT_SECRET` falls back to a hard-coded default](13-jwt-secret-default.md) | Step 4 | 🔴 Security | Step 6, before deploy |

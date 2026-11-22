@@ -14,8 +14,11 @@ def headers(agent) -> dict:
 
 
 @pytest.fixture
-def ticket(make_ticket):
-    return make_ticket(datetime.now(timezone.utc) - timedelta(days=1), priority=Priority.LOW)
+def ticket(make_ticket, agent):
+    """OPEN ticket assigned to `agent`, so status changes are permitted (§4)."""
+    return make_ticket(
+        datetime.now(timezone.utc) - timedelta(days=1), priority=Priority.LOW, assignee_id=agent.id
+    )
 
 
 def test_status_change(api, session, ticket, headers):

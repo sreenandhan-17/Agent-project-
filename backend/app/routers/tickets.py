@@ -19,6 +19,7 @@ from app.services.tickets import (
     add_reply,
     change_priority,
     claim,
+    may_change_status,
     transition,
 )
 
@@ -90,6 +91,12 @@ def update_status(
     agent: Agent = Depends(get_current_agent),
 ):
     ticket = _get_ticket(session, ticket_id, lock=True)
+    if not may_change_status(ticket, agent, body.status):
+        session.rollback()
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Only the assignee or an admin can change this ticket's status.",
+        )
     try:
         transition(session, ticket, body.status, Actor.agent(agent.id))
     except InvalidTransition as e:
@@ -109,6 +116,7 @@ def update_priority(
     session: Session = Depends(get_session),
     agent: Agent = Depends(get_current_agent),
 ):
+    # Any active agent may re-prioritise (triage); audited with old/new deadlines (§4).
     ticket = _get_ticket(session, ticket_id, lock=True)
     change_priority(session, ticket, body.priority, Actor.agent(agent.id))
     session.commit()

@@ -1,5 +1,7 @@
 # 10: Any agent can change any ticket's status or priority
 
+> **✅ RESOLVED (decision: option 2).** `PATCH /status` is limited to the assignee or an ADMIN (403 otherwise), checked before transition validity. Exception: any agent may close a NEW unassigned ticket as spam or a duplicate. `PATCH /priority` is open to any active agent and audited. Implemented in `may_change_status()` (`app/services/tickets.py`). Recorded in PROJECT_SUMMARY.md §4/§5 and in README "Decisions & assumptions". Tests: `tests/test_status_permissions.py` (12 tests).
+
 **Found in:** step 3
 **Severity:** 🟡 Decision needed
 **Fixed in:** step 4 (alongside claim and assignee rules)
