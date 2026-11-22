@@ -2,7 +2,7 @@
 
 One file per issue, numbered in the order found. Resolved issues stay listed with ✅.
 
-**Status after step 4 + note 10:** 149 tests passing, no errors.
+**Status after step 4 + notes 10, 13:** 161 tests passing, no errors.
 
 | # | Issue | Found | Severity | Status / fixed in |
 |---|---|---|---|---|

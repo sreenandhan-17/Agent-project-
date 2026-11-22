@@ -1,5 +1,7 @@
 # 13: `JWT_SECRET` silently falls back to a hard-coded default
 
+> **✅ RESOLVED.** `app/config.py` no longer has defaults for `JWT_SECRET` or `CRON_SECRET`. Built-in dev secrets are used only when `ENV=dev`; anything else, including an unset `ENV`, counts as production. Both secrets must be at least 32 characters, even in dev. `app/main.py` loads the settings when it is imported, so a bad configuration stops startup with: `Invalid configuration: JWT_SECRET is not set (required unless ENV=dev). Generate a secret with: ...`. `hide_input_in_errors=True` keeps secrets and the database password out of that error. `backend/.env` now has `ENV=dev` and fresh 64-character secrets; `.env.example` documents this. Tests: `tests/test_config.py` (12 tests). For deploy (step 6): set `JWT_SECRET` and `CRON_SECRET` in Vercel and do **not** set `ENV=dev` there.
+
 **Found in:** step 4
 **Severity:** 🔴 Security, must fix before deploy
 **Fixed in:** step 6 (deploy)

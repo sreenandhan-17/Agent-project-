@@ -4,8 +4,12 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db import get_session
 from app.routers import auth, public, tickets
+
+# Fail at startup, not on the first login, if secrets are missing or weak (notes/13).
+get_settings()
 
 app = FastAPI(title="Frontdesk API")
 app.include_router(auth.router)
