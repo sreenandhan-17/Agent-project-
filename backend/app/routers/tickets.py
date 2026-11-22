@@ -1,16 +1,31 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict
+from fastapi.responses import PlainTextResponse
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.deps import get_current_agent
-from app.models import Agent, Priority, Ticket, TicketStatus
+from app.models import Agent, AuthorType, Priority, Ticket, TicketStatus, Visibility
+from app.serializers.customer import render_transcript, serialize_for_customer
 from app.services.audit import Actor
-from app.services.tickets import InvalidTransition, change_priority, transition
+from app.services.email import send_customer_email
+from app.services.tickets import (
+    ClaimOutcome,
+    InvalidTransition,
+    NotAssignee,
+    add_note,
+    add_reply,
+    change_priority,
+    claim,
+    transition,
+)
 
-router = APIRouter(prefix="/api/tickets", tags=["tickets"])
+# Every route here is agent-only.
+router = APIRouter(
+    prefix="/api/tickets", tags=["tickets"], dependencies=[Depends(get_current_agent)]
+)
 
 
 class StatusChange(BaseModel):
@@ -19,6 +34,10 @@ class StatusChange(BaseModel):
 
 class PriorityChange(BaseModel):
     priority: Priority
+
+
+class MessageIn(BaseModel):
+    body: str = Field(min_length=1, max_length=10_000)
 
 
 class TicketOut(BaseModel):
@@ -31,6 +50,7 @@ class TicketOut(BaseModel):
     priority: Priority
     assignee_id: int | None
     created_at: datetime
+    first_response_at: datetime | None
     first_response_due_at: datetime | None
     resolution_due_at: datetime | None
     paused_at: datetime | None
@@ -40,9 +60,23 @@ class TicketOut(BaseModel):
     reopen_count: int
 
 
-def _locked_ticket(session: Session, ticket_id: int) -> Ticket:
-    # Row lock so two concurrent changes to one ticket apply one after the other.
-    ticket = session.get(Ticket, ticket_id, with_for_update=True)
+class MessageOut(BaseModel):
+    """Agent-side message view: includes INTERNAL notes. Never send to customers."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ticket_id: int
+    author_type: AuthorType
+    author_agent_id: int | None
+    visibility: Visibility
+    body: str
+    created_at: datetime
+
+
+def _get_ticket(session: Session, ticket_id: int, *, lock: bool = False) -> Ticket:
+    # Row lock (lock=True) so two concurrent changes to one ticket apply one after the other.
+    ticket = session.get(Ticket, ticket_id, with_for_update=lock)
     if ticket is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "ticket not found")
     return ticket
@@ -55,7 +89,7 @@ def update_status(
     session: Session = Depends(get_session),
     agent: Agent = Depends(get_current_agent),
 ):
-    ticket = _locked_ticket(session, ticket_id)
+    ticket = _get_ticket(session, ticket_id, lock=True)
     try:
         transition(session, ticket, body.status, Actor.agent(agent.id))
     except InvalidTransition as e:
@@ -75,7 +109,66 @@ def update_priority(
     session: Session = Depends(get_session),
     agent: Agent = Depends(get_current_agent),
 ):
-    ticket = _locked_ticket(session, ticket_id)
+    ticket = _get_ticket(session, ticket_id, lock=True)
     change_priority(session, ticket, body.priority, Actor.agent(agent.id))
     session.commit()
     return ticket
+
+
+@router.post("/{ticket_id}/claim", response_model=TicketOut)
+def claim_ticket(
+    ticket_id: int,
+    session: Session = Depends(get_session),
+    agent: Agent = Depends(get_current_agent),
+):
+    result = claim(session, ticket_id, agent)
+    if result.outcome is ClaimOutcome.NOT_FOUND:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "ticket not found")
+    if result.outcome is ClaimOutcome.TAKEN:
+        session.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, f"Already taken by {result.assignee_name}")
+    session.commit()
+    return _get_ticket(session, ticket_id)
+
+
+@router.post("/{ticket_id}/replies", response_model=MessageOut, status_code=201)
+def reply(
+    ticket_id: int,
+    body: MessageIn,
+    session: Session = Depends(get_session),
+    agent: Agent = Depends(get_current_agent),
+):
+    ticket = _get_ticket(session, ticket_id, lock=True)
+    try:
+        message = add_reply(session, ticket, agent, body.body)
+    except NotAssignee:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Only the assignee can reply. Take the ticket first."
+            if ticket.assignee_id is None
+            else "Only the assignee can reply.",
+        )
+    session.commit()
+    session.refresh(ticket, ["messages"])
+    send_customer_email(ticket, message)
+    return message
+
+
+@router.post("/{ticket_id}/notes", response_model=MessageOut, status_code=201)
+def note(
+    ticket_id: int,
+    body: MessageIn,
+    session: Session = Depends(get_session),
+    agent: Agent = Depends(get_current_agent),
+):
+    ticket = _get_ticket(session, ticket_id)
+    message = add_note(session, ticket, agent, body.body)
+    session.commit()
+    return message
+
+
+@router.get("/{ticket_id}/export", response_class=PlainTextResponse)
+def export_transcript(ticket_id: int, session: Session = Depends(get_session)):
+    """Customer-facing transcript: built from serialize_for_customer(), so no internal notes."""
+    ticket = _get_ticket(session, ticket_id)
+    return render_transcript(serialize_for_customer(ticket, ticket.messages))

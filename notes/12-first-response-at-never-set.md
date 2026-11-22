@@ -1,5 +1,7 @@
 # 12: `first_response_at` is never set, so the first-reply SLA can never be met
 
+> **✅ RESOLVED in step 4.** `add_reply()` sets `first_response_at` on the first PUBLIC reply only. A second reply leaves it unchanged, and internal notes never set it. Tests: `test_first_public_reply_sets_first_response_at` and `test_internal_note_does_not_set_first_response_at`.
+
 **Found in:** step 3
 **Severity:** 🟠 Business rule gap
 **Fixed in:** step 4 (replies)

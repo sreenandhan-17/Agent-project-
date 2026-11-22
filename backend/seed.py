@@ -7,10 +7,10 @@ Every demo agent logs in with password:  frontdesk-demo
 
 from datetime import date, datetime, timedelta, timezone
 
-import bcrypt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth import hash_password
 from app.db import get_sessionmaker
 from app.models import (
     Agent,
@@ -86,10 +86,6 @@ TICKETS = [
     ("Appointment reminders sent twice", 4, Priority.MEDIUM, TicketStatus.REOPENED, 7, 72),
     ("Report dashboard is slow in the evenings", 4, Priority.MEDIUM, TicketStatus.OPEN, 8, 10),
 ]
-
-
-def hash_password(pw: str) -> str:
-    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
 
 
 def seed_agents(session: Session) -> list[Agent]:

@@ -1,14 +1,28 @@
-"""Ticket state changes. See PROJECT_SUMMARY.md §3.3, §3.6, §5.
+"""Ticket state changes. See PROJECT_SUMMARY.md §3.3, §3.6, §4, §5.
 
-Every status change goes through transition(); every priority change through change_priority().
-Both write their audit events in the caller's transaction and never commit.
+Every status change goes through transition() (except the atomic claim, which sets NEW -> OPEN
+in its own UPDATE); every priority change through change_priority(). All functions write their
+audit events in the caller's transaction and never commit.
 """
 
+import enum
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.models import AuditAction, Priority, Ticket, TicketStatus
+from app.models import (
+    Agent,
+    AuditAction,
+    AuthorType,
+    Customer,
+    Message,
+    Priority,
+    Ticket,
+    TicketStatus,
+    Visibility,
+)
 from app.services.audit import Actor, record
 from app.sla.policy import compute_deadlines, load_holidays
 from app.sla.working_hours import working_minutes_between
@@ -125,3 +139,198 @@ def change_priority(
     new = {"priority": new_priority.value, **_deadlines(ticket)}
     record(session, ticket.id, actor, AuditAction.PRIORITY_CHANGED, "priority", old, new)
     return True
+
+
+# --- INC-0291: atomic claim ----------------------------------------------------------------
+
+
+class ClaimOutcome(enum.Enum):
+    CLAIMED = "claimed"
+    ALREADY_MINE = "already_mine"
+    TAKEN = "taken"
+    NOT_FOUND = "not_found"
+
+
+@dataclass(frozen=True)
+class ClaimResult:
+    outcome: ClaimOutcome
+    assignee_name: str | None = None
+
+
+# One statement: only succeeds while assignee_id IS NULL. A concurrent claimer blocks on the
+# row lock, then re-checks the WHERE against the committed row and matches 0 rows.
+_CLAIM_SQL = text(
+    """
+    WITH before AS (SELECT id, status FROM tickets WHERE id = :id)
+    UPDATE tickets AS t
+       SET assignee_id = :agent_id,
+           status = CASE WHEN t.status = 'NEW' THEN 'OPEN'::ticket_status ELSE t.status END,
+           updated_at = now()
+      FROM before
+     WHERE t.id = before.id AND t.assignee_id IS NULL
+    RETURNING before.status::text AS old_status, t.status::text AS new_status
+    """
+)
+
+
+def claim(session: Session, ticket_id: int, agent: Agent) -> ClaimResult:
+    row = session.execute(_CLAIM_SQL, {"id": ticket_id, "agent_id": agent.id}).one_or_none()
+    if row is not None:
+        actor = Actor.agent(agent.id)
+        record(session, ticket_id, actor, AuditAction.CLAIMED, "assignee_id", None, agent.id)
+        if row.old_status != row.new_status:
+            record(
+                session, ticket_id, actor, AuditAction.STATUS_CHANGED, "status",
+                row.old_status, row.new_status,
+            )
+        _refresh_if_loaded(session, ticket_id)
+        return ClaimResult(ClaimOutcome.CLAIMED, agent.name)
+
+    ticket = session.get(Ticket, ticket_id, populate_existing=True)
+    if ticket is None:
+        return ClaimResult(ClaimOutcome.NOT_FOUND)
+    if ticket.assignee_id == agent.id:
+        return ClaimResult(ClaimOutcome.ALREADY_MINE, agent.name)
+    return ClaimResult(ClaimOutcome.TAKEN, ticket.assignee.name if ticket.assignee else None)
+
+
+def _refresh_if_loaded(session: Session, ticket_id: int) -> None:
+    """The raw UPDATE bypassed the ORM; reload a cached Ticket so callers see new values."""
+    session.get(Ticket, ticket_id, populate_existing=True)
+
+
+# --- Messages ------------------------------------------------------------------------------
+
+
+class NotAssignee(Exception):
+    pass
+
+
+def add_reply(
+    session: Session, ticket: Ticket, agent: Agent, body: str, *, now: datetime | None = None
+) -> Message:
+    """PUBLIC reply. Assignee only (INC-0291). The first one sets first_response_at (§3.1)."""
+    if ticket.assignee_id != agent.id:
+        raise NotAssignee()
+    now = _now(now)
+    message = Message(
+        ticket_id=ticket.id,
+        author_type=AuthorType.AGENT,
+        author_agent_id=agent.id,
+        visibility=Visibility.PUBLIC,
+        body=body,
+        created_at=now,
+    )
+    session.add(message)
+    if ticket.first_response_at is None:
+        ticket.first_response_at = now
+    session.flush()
+    record(
+        session, ticket.id, Actor.agent(agent.id), AuditAction.REPLY_SENT, "message_id",
+        None, message.id,
+    )
+    return message
+
+
+def add_note(
+    session: Session, ticket: Ticket, agent: Agent, body: str, *, now: datetime | None = None
+) -> Message:
+    """INTERNAL note. Any agent. Never counts as a first response, never reaches a customer."""
+    message = Message(
+        ticket_id=ticket.id,
+        author_type=AuthorType.AGENT,
+        author_agent_id=agent.id,
+        visibility=Visibility.INTERNAL,
+        body=body,
+        created_at=_now(now),
+    )
+    session.add(message)
+    session.flush()
+    record(
+        session, ticket.id, Actor.agent(agent.id), AuditAction.NOTE_ADDED, "message_id",
+        None, message.id,
+    )
+    return message
+
+
+# --- Customer side -------------------------------------------------------------------------
+
+
+def create_customer_ticket(
+    session: Session,
+    *,
+    name: str,
+    email: str,
+    subject: str,
+    body: str,
+    phone: str | None = None,
+    company: str | None = None,
+    priority: Priority = Priority.MEDIUM,
+    now: datetime | None = None,
+) -> Ticket:
+    """A ticket submitted by a customer. Finds or creates the customer by email."""
+    now = _now(now)
+    email = email.strip().lower()
+    customer = session.query(Customer).filter(Customer.email == email).one_or_none()
+    if customer is None:
+        customer = Customer(name=name, email=email, phone=phone, company=company)
+        session.add(customer)
+        session.flush()
+
+    ticket = Ticket(
+        subject=subject,
+        customer_id=customer.id,
+        status=TicketStatus.NEW,
+        priority=priority,
+        created_at=now,
+        last_customer_reply_at=now,
+        paused_minutes=0,
+        reopen_count=0,
+    )
+    ticket.first_response_due_at, ticket.resolution_due_at = compute_deadlines(
+        ticket, load_holidays(session)
+    )
+    session.add(ticket)
+    session.flush()
+    session.add(
+        Message(
+            ticket_id=ticket.id,
+            author_type=AuthorType.CUSTOMER,
+            author_customer_id=customer.id,
+            visibility=Visibility.PUBLIC,
+            body=body,
+            created_at=now,
+        )
+    )
+    record(
+        session, ticket.id, Actor.customer(customer.id), AuditAction.TICKET_CREATED, None, None,
+        {"subject": subject, "priority": priority.value, "status": TicketStatus.NEW.value},
+    )
+    session.flush()
+    return ticket
+
+
+def add_customer_reply(
+    session: Session, ticket: Ticket, body: str, *, now: datetime | None = None
+) -> Message:
+    """Customer reply. Resumes the SLA clock if the ticket was waiting on the customer (§3.3).
+
+    Reopening resolved/closed tickets (7-day window) is build step 7 (notes/09).
+    """
+    now = _now(now)
+    actor = Actor.customer(ticket.customer_id)
+    message = Message(
+        ticket_id=ticket.id,
+        author_type=AuthorType.CUSTOMER,
+        author_customer_id=ticket.customer_id,
+        visibility=Visibility.PUBLIC,
+        body=body,
+        created_at=now,
+    )
+    session.add(message)
+    ticket.last_customer_reply_at = now
+    session.flush()
+    record(session, ticket.id, actor, AuditAction.CUSTOMER_REPLIED, "message_id", None, message.id)
+    if ticket.status is TicketStatus.WAITING_ON_CUSTOMER:
+        transition(session, ticket, TicketStatus.OPEN, actor, now=now)
+    return message

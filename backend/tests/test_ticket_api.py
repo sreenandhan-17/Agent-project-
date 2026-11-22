@@ -5,12 +5,12 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.models import Priority, TicketStatus
-from tests.conftest import audit_actions
+from tests.conftest import audit_actions, auth_headers
 
 
 @pytest.fixture
 def headers(agent) -> dict:
-    return {"X-Agent-Id": str(agent.id)}
+    return auth_headers(agent)
 
 
 @pytest.fixture
@@ -65,8 +65,10 @@ def test_unknown_ticket_is_404(api, headers):
     assert r.status_code == 404
 
 
-@pytest.mark.parametrize("hdrs", [{}, {"X-Agent-Id": "999999"}])
-def test_requires_known_agent(api, session, ticket, hdrs):
+@pytest.mark.parametrize(
+    "hdrs", [{}, {"Authorization": "Bearer not-a-jwt"}, {"Authorization": "Basic abc"}]
+)
+def test_requires_valid_token(api, session, ticket, hdrs):
     r = api.patch(f"/api/tickets/{ticket.id}/status", json={"status": "RESOLVED"}, headers=hdrs)
     assert r.status_code == 401
     session.refresh(ticket)

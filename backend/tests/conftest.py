@@ -9,6 +9,7 @@ from sqlalchemy import Engine, create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
+from app.auth import create_access_token, hash_password
 from app.config import BACKEND_DIR, get_settings
 from app.db import get_session
 from app.main import app
@@ -17,16 +18,26 @@ from app.sla.policy import compute_deadlines
 
 
 @pytest.fixture(scope="session")
-def db_url() -> str:
-    settings = get_settings()
-    return settings.test_database_url or settings.database_url
+def dedicated_test_db() -> bool:
+    """True when TEST_DATABASE_URL is set, i.e. tests may wipe and commit freely."""
+    return bool(get_settings().test_database_url)
 
 
 @pytest.fixture(scope="session")
-def engine(db_url: str) -> Engine:
+def db_url(dedicated_test_db: bool) -> str:
+    settings = get_settings()
+    return settings.test_database_url if dedicated_test_db else settings.database_url
+
+
+@pytest.fixture(scope="session")
+def engine(db_url: str, dedicated_test_db: bool) -> Engine:
     cfg = Config(str(BACKEND_DIR / "alembic.ini"))
     cfg.set_main_option("script_location", str(BACKEND_DIR / "alembic"))
     cfg.attributes["url"] = db_url
+    if dedicated_test_db:
+        # Fresh schema every run: committed audit rows can't be deleted any other way.
+        # Never done against DATABASE_URL.
+        command.downgrade(cfg, "base")
     command.upgrade(cfg, "head")
     eng = create_engine(db_url, poolclass=NullPool)
     yield eng
@@ -93,13 +104,34 @@ def api(connection) -> TestClient:
 _seq = count(1)
 
 
+TEST_PASSWORD = "correct horse battery staple"
+
+
 @pytest.fixture
-def agent(session: Session) -> Agent:
-    n = next(_seq)
-    a = Agent(name=f"Test Agent {n}", email=f"agent{n}@test.example", password_hash="x")
-    session.add(a)
-    session.flush()
-    return a
+def make_agent(session: Session):
+    def _make(*, password: str | None = None, **fields) -> Agent:
+        n = next(_seq)
+        a = Agent(
+            name=f"Test Agent {n}",
+            email=f"agent{n}@test.example",
+            password_hash=hash_password(password) if password else "x",
+            **fields,
+        )
+        session.add(a)
+        session.flush()
+        return a
+
+    return _make
+
+
+@pytest.fixture
+def agent(make_agent) -> Agent:
+    return make_agent()
+
+
+def auth_headers(agent: Agent) -> dict[str, str]:
+    """Authorization header with a valid JWT for `agent`."""
+    return {"Authorization": f"Bearer {create_access_token(agent.id)}"}
 
 
 @pytest.fixture

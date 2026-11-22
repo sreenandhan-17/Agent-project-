@@ -1,5 +1,7 @@
 # 08: Endpoints trust an `X-Agent-Id` header (temporary auth)
 
+> **✅ RESOLVED in step 4.** `POST /api/auth/login` (bcrypt, HS256 JWT, 12h expiry, `sub` = agent id) and `GET /api/auth/me`. `get_current_agent` reads `Authorization: Bearer <jwt>`, and returns 401 if the token is missing, malformed, expired, signed with another key, or `alg=none`, or if the agent is unknown or inactive. A search for `X-Agent-Id` in `backend/app` finds nothing. Tests: `tests/test_auth.py`.
+
 **Found in:** step 3
 **Severity:** 🔴 Security, must fix before deploy
 **Fixed in:** step 4 or 5, before step 6 (deploy)
